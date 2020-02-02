@@ -24,7 +24,7 @@ def get_t_lk(M1, M2, M3, ai, ao):
     return t_lk
     
 
-@jit(nopython=True)
+@jit(nopython=True, fastmath=True)
 def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     """
     GR precession & GW decay
@@ -37,8 +37,8 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     br_flag, ss_flag\
                 = par
         
-    mu_i, mu_o, omega_i, \
-    Li_e0, Lo_e0, ei, eo, eff_i, eff_o, \
+    mu_i, omega_i,\
+    Li_e0, ei, eff_i,\
     uLi_x, uLi_y, uLi_z\
                 = par_GR
     
@@ -78,10 +78,9 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     
     dy_orb_vect = np.array([\
             dLi_x, dLi_y, dLi_z, dei_x, dei_y, dei_z, dai])
-    
     return dy_orb_vect
 
-@jit(nopython=True)
+@jit(nopython=True, fastmath=True)
 def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     """
     Lidov-Kozai
@@ -157,7 +156,7 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     return dy_LK_vect
 
 
-@jit(nopython=True)
+@jit(nopython=True, fastmath=True)
 def get_dy_SP(y_SP_vect, par, par_SP):
     """
     de Sitter spin-orbit & Lense Thirring spin-spin
@@ -187,19 +186,23 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     omega2_SL = 1.5*G_c2*(M1+mu_i/3.)/(ai*eff_i**2.)*omega_i
     omega1_SL_br = 0.5*G_c2*S1*(4.+3.*M2/M1)/(ai3_eff_i3)
     omega2_SL_br = 0.5*G_c2*S2*(4.+3.*M1/M2)/(ai3_eff_i3)
+    #print('omega_SL:', omega1_SL, omega2_SL, omega1_SL_br, omega2_SL_br)
     
     omega1_SL_S1 = omega1_SL * S1
     omega2_SL_S2 = omega2_SL * S2
     omega1_SL_br_Li = omega1_SL_br*Li_e0*eff_i * br_flag
     omega2_SL_br_Li = omega2_SL_br*Li_e0*eff_i * br_flag
+    #print('omega_SL * S', omega1_SL_S1, omega2_SL_S2, omega1_SL_br_Li, omega2_SL_br_Li)
     
     omega1_SS = 0.5*G_c2*S2/(ai3_eff_i3)
     omega2_SS = 0.5*G_c2*S1/(ai3_eff_i3)
     omega_SS_br = -1.5*G_c2*S1*S2/(mu_i*omega_i)/(ai3_eff_i3*ai**2.*eff_i)
+    #print('omega_SS', omega1_SS, omega2_SS, omega_SS_br)
     
     omega1_SS_S1 = omega1_SS * S1 * ss_flag
     omega2_SS_S2 = omega2_SS * S2 * ss_flag
     omega_SS_br_Li = omega_SS_br*Li_e0*eff_i * ss_flag * br_flag
+    #print('omega_SS * S', omega1_SS_S1, omega2_SS_S2, omega_SS_br_Li)
     
     # directional products 
     uLi_d_uS1 = (uLi_x*uS1_x + uLi_y*uS1_y + uLi_z*uS1_z)
@@ -243,17 +246,17 @@ def get_dy_SP(y_SP_vect, par, par_SP):
             
     dei_x = omega1_SL_br * (uS1_c_ei_x - 3.*uLi_d_uS1*uLi_c_ei_x)\
           + omega2_SL_br * (uS2_c_ei_x - 3.*uLi_d_uS2*uLi_c_ei_x)\
-          + omega_SS_br_Li * (uLi_d_uS1*uS2_c_ei_x + uLi_d_uS2*uS1_c_ei_x + \
+          + omega_SS_br  * (uLi_d_uS1*uS2_c_ei_x + uLi_d_uS2*uS1_c_ei_x + \
                              +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_x)
             
     dei_y = omega1_SL_br * (uS1_c_ei_y - 3.*uLi_d_uS1*uLi_c_ei_y)\
           + omega2_SL_br * (uS2_c_ei_y - 3.*uLi_d_uS2*uLi_c_ei_y)\
-          + omega_SS_br_Li * (uLi_d_uS1*uS2_c_ei_y + uLi_d_uS2*uS1_c_ei_y + \
+          + omega_SS_br  * (uLi_d_uS1*uS2_c_ei_y + uLi_d_uS2*uS1_c_ei_y + \
                              +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_y)
            
     dei_z = omega1_SL_br * (uS1_c_ei_z - 3.*uLi_d_uS1*uLi_c_ei_z)\
           + omega2_SL_br * (uS2_c_ei_z - 3.*uLi_d_uS2*uLi_c_ei_z)\
-          + omega_SS_br_Li * (uLi_d_uS1*uS2_c_ei_z + uLi_d_uS2*uS1_c_ei_z + \
+          + omega_SS_br  * (uLi_d_uS1*uS2_c_ei_z + uLi_d_uS2*uS1_c_ei_z + \
                              +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_z)
             
     dS1_x = omega1_SL_S1 * (uLi_c_uS1_x)\
@@ -282,6 +285,7 @@ def get_dy_SP(y_SP_vect, par, par_SP):
                           ])
     return dy_SP_vect
 
+@jit(nopython=True, fastmath=True)
 def evol_LK_quad_da(t_nat, y_nat_vect, par):
     # parse parameters
     # 0-5
@@ -344,8 +348,8 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     y_orb_vect = np.array([\
         Li_x, Li_y, Li_z, ei_x, ei_y, ei_z, ai\
                 ])
-    par_GR = np.array([mu_i, mu_o, omega_i, \
-                       Li_e0, Lo_e0, ei, eo, eff_i, eff_o, \
+    par_GR = np.array([mu_i, omega_i,\
+                       Li_e0, ei, eff_i,\
                        uLi_x, uLi_y, uLi_z])
     
     dLi_GR_x, dLi_GR_y, dLi_GR_z, \
@@ -425,8 +429,112 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     
     return dy_nat_vect
 
+@jit(nopython=True, fastmath=True)
+def evol_binary(t_nat, y_nat_vect, par):
+    # parse parameters
+    # 0-5
+    # 6
+    # 7-9
+    # 10-12
+    Li_nat_x, Li_nat_y, Li_nat_z, ei_x, ei_y, ei_z, \
+    ai_nat, \
+    S1_nat_x, S1_nat_y, S1_nat_z, \
+    S2_nat_x, S2_nat_y, S2_nat_z\
+                = y_nat_vect
+        
+    t_unit, Li_unit, __, ai_unit, S1_unit, S2_unit, \
+    M1, M2, __, __,\
+    br_flag, ss_flag\
+                = par
+        
+    # convert to cgs units
+    Li_x, Li_y, Li_z = Li_nat_x*Li_unit, Li_nat_y*Li_unit, Li_nat_z*Li_unit
+    ai = ai_nat * ai_unit
+    
+    S1_x, S1_y, S1_z = S1_nat_x*S1_unit, S1_nat_y*S1_unit, S1_nat_z*S1_unit
+    S2_x, S2_y, S2_z = S2_nat_x*S2_unit, S2_nat_y*S2_unit, S2_nat_z*S2_unit
+    
+    # scalar quantities that will be useful for the other parts
+    mu_i = M1*M2/(M1+M2)
+    omega_i = np.sqrt(G*(M1+M2)/ai**3.)
+    
+    Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
 
-
+    ei = np.sqrt(ei_x**2. + ei_y**2. + ei_z**2.)
+    eff_i = np.sqrt(1.-ei**2.)
+    
+    S1 = np.sqrt(S1_x**2. + S1_y**2. + S1_z**2.)
+    S2 = np.sqrt(S2_x**2. + S2_y**2. + S2_z**2.)
+    
+    # directional quantities
+    uLi_x = Li_x / (Li_e0 * eff_i)
+    uLi_y = Li_y / (Li_e0 * eff_i)
+    uLi_z = Li_z / (Li_e0 * eff_i)
+    
+    ji_x, ji_y, ji_z = Li_x/Li_e0, Li_y/Li_e0, Li_z/Li_e0
+    
+    uS1_x, uS1_y, uS1_z = S1_x/S1, S1_y/S1, S1_z/S1
+    uS2_x, uS2_y, uS2_z = S2_x/S2, S2_y/S2, S2_z/S2
+    
+    # get GR & GW terms
+    y_orb_vect = np.array([\
+        Li_x, Li_y, Li_z, ei_x, ei_y, ei_z, ai\
+                ])
+    par_GR = np.array([mu_i, omega_i,\
+                       Li_e0, ei, eff_i,\
+                       uLi_x, uLi_y, uLi_z])
+    
+    dLi_GR_x, dLi_GR_y, dLi_GR_z, \
+    dei_GR_x, dei_GR_y, dei_GR_z, \
+    dai \
+        = get_dy_orb_GR_GW(y_orb_vect, par, par_GR)
+        
+    
+    # get spin terms
+    y_SP_vect = np.array([\
+        Li_x, Li_y, Li_z, ei_x, ei_y, ei_z,\
+        ai,\
+        S1_x, S1_y, S1_z,\
+        S2_x, S2_y, S2_z])
+    
+    par_SP = np.array([mu_i, omega_i, Li_e0, ei, eff_i, dai, \
+                       uLi_x, uLi_y, uLi_z, \
+                       S1, S2, \
+                       uS1_x, uS1_y, uS1_z, uS2_x, uS2_y, uS2_z])
+    
+    dLi_SP_x, dLi_SP_y, dLi_SP_z, dei_SP_x, dei_SP_y, dei_SP_z, \
+    __, \
+    dS1_SP_x, dS1_SP_y, dS1_SP_z, \
+    dS2_SP_x, dS2_SP_y, dS2_SP_z\
+        = get_dy_SP(y_SP_vect, par, par_SP)
+        
+    # total 
+    # inner orb sees GR&GW + SP back reaction
+    dLi_nat_x = (dLi_GR_x + dLi_SP_x) / Li_unit
+    dLi_nat_y = (dLi_GR_y + dLi_SP_y) / Li_unit
+    dLi_nat_z = (dLi_GR_z + dLi_SP_z) / Li_unit
+    dei_x = dei_GR_x + dei_SP_x
+    dei_y = dei_GR_y + dei_SP_y
+    dei_z = dei_GR_z + dei_SP_z
+    
+    # GW of semi-major axis
+    dai_nat = dai / ai_unit
+    
+    # S1/S2 sees SP (de Sitter & Lense-Thirring)
+    dS1_nat_x = dS1_SP_x / S1_unit
+    dS1_nat_y = dS1_SP_y / S1_unit
+    dS1_nat_z = dS1_SP_z / S1_unit
+    dS2_nat_x = dS2_SP_x / S2_unit
+    dS2_nat_y = dS2_SP_y / S2_unit
+    dS2_nat_z = dS2_SP_z / S2_unit
+    
+    dy_nat_vect = np.array([\
+            dLi_nat_x, dLi_nat_y, dLi_nat_z, dei_x, dei_y, dei_z, \
+            dai_nat, \
+            dS1_nat_x, dS1_nat_y, dS1_nat_z, \
+            dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
+#    print(dy_nat_vect)
+    return dy_nat_vect
     
     
     
