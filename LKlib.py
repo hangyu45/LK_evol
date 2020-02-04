@@ -104,7 +104,7 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
                 = par_LK
 
     # scalar quantities
-    dLi_e0 = 0.5 * Li_e0 / ai * dai
+    #dLi_e0 = 0.5 * Li_e0 / ai * dai # the GW loss has been accounted for
     t_LK = (1./omega_i) * (M1+M2)/M3 * (ao*eff_o/ai)**3.
     p75_t_LK = 0.75/t_LK
     
@@ -141,9 +141,12 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     deo_z = 0.
     
     # derivatives on the angular momenta
-    dLi_x = Li_e0 * dji_x + dLi_e0 * ji_x
-    dLi_y = Li_e0 * dji_y + dLi_e0 * ji_y
-    dLi_z = Li_e0 * dji_z + dLi_e0 * ji_z
+    
+    # the GW part have been accounted for in get_dy_orb_GR_GW()
+    # should not need to include it again in LK
+    dLi_x = Li_e0 * dji_x #+ dLi_e0 * ji_x
+    dLi_y = Li_e0 * dji_y #+ dLi_e0 * ji_y
+    dLi_z = Li_e0 * dji_z #+ dLi_e0 * ji_z
     
     dLo_x = Lo_e0 * djo_x
     dLo_y = Lo_e0 * djo_y
