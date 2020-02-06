@@ -9,6 +9,19 @@ from numba import jit, prange
 
 from myConstants import *
 
+@jit(nopython=True)
+def inner(xx, yy):
+    return np.sum(xx*yy)
+
+@jit(nopython=True)
+def cross(xx, yy):
+    zz=np.array([\
+         xx[1]*yy[2] - xx[2]*yy[1], \
+         xx[2]*yy[0] - xx[0]*yy[2], \
+         xx[0]*yy[1] - xx[1]*yy[0]
+                ])
+    return zz
+
 @jit(nopython=True, fastmath=True)
 def get_inst_t_gw_from_a_orb(M1, M2, a_orb, e):
     Mt=M1+M2
@@ -74,11 +87,12 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     dei_GW_v = dei_GW * ei_v
         
     # total
+    dai =np.array([dai])
     dLi_v = dLi_GW_v
     dei_v = dei_GR_v + dei_GW_v
     
     dy_orb_vect = np.array([\
-                    dai, \
+                    dai[0], \
                     dLi_v[0], dLi_v[1], dLi_v[2], \
                     dei_v[0], dei_v[1], dei_v[2]])
     return dy_orb_vect
@@ -236,7 +250,7 @@ def get_dy_SP(y_SP_vect, par, par_SP):
                  dS2_v[0], dS2_v[1], dS2_v[2]])
     return dy_SP_vect
 
-@jit(fastmath=True, parallel=True)
+@jit(nopython=True, fastmath=True, parallel=True)
 def evol_LK_quad_da(t_nat, y_nat_vect, par):
     # parse parameters
     # 0
@@ -289,25 +303,28 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     uS1_v = S1_v / S1
     uS2_v = S2_v / S2
     
-    for i in prange(3):
-        if i==0:
-            # get GR & GW terms
-            y_orb_vect = np.hstack([ai, Li_v, ei_v])
-            par_GR = np.hstack([mu_i, omega_i,\
-                                Li_e0, ei, eff_i,\
-                                uLi_v])
+    # get GR & GW terms
+    y_orb_vect = np.array([ai, \
+                                   Li_v[0], Li_v[1], Li_v[2], \
+                                   ei_v[0], ei_v[1], ei_v[2]])
+            par_GR = np.array([mu_i, omega_i,\
+                               Li_e0, ei, eff_i,\
+                               uLi_v[0], uLi_v[1], uLi_v[2]])
 
             dai,\
             dLi_GR_x, dLi_GR_y, dLi_GR_z, \
             dei_GR_x, dei_GR_y, dei_GR_z\
                 = get_dy_orb_GR_GW(y_orb_vect, par, par_GR)
                 
-        elif i==1:
             # get LK terms
-            y_LK_vect = np.hstack([Li_v, ei_v, Lo_v, eo_v])
-            par_LK = np.hstack([mu_i, mu_o, omega_i, ai, \
+            y_LK_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                                  ei_v[0], ei_v[1], ei_v[2], \
+                                  Lo_v[0], Lo_v[1], Lo_v[2], \
+                                  eo_v[0], eo_v[1], eo_v[2]])
+            par_LK = np.array([mu_i, mu_o, omega_i, ai, \
                                 Li_e0, Lo_e0, ei, eo, eff_i, eff_o,\
-                                uLi_v, uLo_v])
+                                uLi_v[0], uLi_v[1], uLi_v[2], \
+                                uLo_v[0], uLo_v[1], uLo_v[2]])
             
             dLi_LK_x, dLi_LK_y, dLi_LK_z, \
             dei_LK_x, dei_LK_y, dei_LK_z, \
@@ -315,12 +332,16 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
             deo_LK_x, deo_LK_y, deo_LK_z\
                 = get_dy_LK_quad_da(y_LK_vect, par, par_LK)
                 
-        else:
             # get SL & SS terms
-            y_SP_vect = np.hstack([Li_v, ei_v, S1_v, S2_v])
-            par_SP = np.hstack([mu_i, omega_i, ai, \
+            y_SP_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                                  ei_v[0], ei_v[1], ei_v[2], \
+                                  S1_v[0], S1_v[1], S1_v[2], \
+                                  S2_v[0], S2_v[1], S2_v[2]])
+            par_SP = np.array([mu_i, omega_i, ai, \
                                 Li_e0, ei, eff_i, S1, S2, \
-                                uLi_v, uS1_v, uS2_v])
+                                uLi_v[0], uLi_v[1], uLi_v[2], \
+                                uS1_v[0], uS1_v[1], uS1_v[2], \
+                                uS2_v[0], uS2_v[1], uS2_v[2]])
             
             dLi_SP_x, dLi_SP_y, dLi_SP_z, \
             dei_SP_x, dei_SP_y, dei_SP_z, \
@@ -364,15 +385,4 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
             dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
     return dy_nat_vect
 
-@jit(nopython=True)
-def inner(xx, yy):
-    return np.sum(xx*yy)
 
-@jit(nopython=True)
-def cross(xx, yy):
-    zz=np.array([\
-         xx[1]*yy[2] - xx[2]*yy[1], \
-         xx[2]*yy[0] - xx[0]*yy[2], \
-         xx[0]*yy[1] - xx[1]*yy[0]
-                ])
-    return zz
