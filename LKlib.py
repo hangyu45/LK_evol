@@ -9,19 +9,6 @@ from numba import jit, prange
 
 from myConstants import *
 
-@jit(nopython=True)
-def inner(xx, yy):
-    return np.sum(xx*yy)
-
-@jit(nopython=True)
-def cross(xx, yy):
-    zz=np.array([\
-         xx[1]*yy[2] - xx[2]*yy[1], \
-         xx[2]*yy[0] - xx[0]*yy[2], \
-         xx[0]*yy[1] - xx[1]*yy[0]
-                ])
-    return zz
-
 @jit(nopython=True, fastmath=True)
 def get_inst_t_gw_from_a_orb(M1, M2, a_orb, e):
     Mt=M1+M2
@@ -231,8 +218,8 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     dS2_SL_v = omega2_SL_S2 * (uLi_c_uS2_v)
     
     # Lense-Thirring
-    dLi_SS_v = omega_SS_br_Li * (- uLi_d_uS1*uLi_c_uS2_v - uLi_d_uS2*uLi_c_uS2_v)
-    dei_SS_v = omega_SS_br * (uLi_d_uS1*uS2_c_ei_v + uLi_d_uS2*uS2_c_ei_v\
+    dLi_SS_v = omega_SS_br_Li * (- uLi_d_uS1*uLi_c_uS2_v - uLi_d_uS2*uLi_c_uS1_v)
+    dei_SS_v = omega_SS_br * (uLi_d_uS1*uS2_c_ei_v + uLi_d_uS2*uS1_c_ei_v\
                              +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_v)
     dS1_SS_v = omega1_SS_S1 * (- uS1_c_uS2_v - 3.*uLi_d_uS2*uLi_c_uS1_v)
     dS2_SS_v = omega2_SS_S2 * (+ uS1_c_uS2_v - 3.*uLi_d_uS1*uLi_c_uS2_v)
@@ -250,7 +237,7 @@ def get_dy_SP(y_SP_vect, par, par_SP):
                  dS2_v[0], dS2_v[1], dS2_v[2]])
     return dy_SP_vect
 
-@jit(nopython=True, fastmath=True, parallel=True)
+@jit(nopython=True, fastmath=True)
 def evol_LK_quad_da(t_nat, y_nat_vect, par):
     # parse parameters
     # 0
@@ -385,4 +372,117 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
             dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
     return dy_nat_vect
 
+@jit(nopython=True, fastmath=True)
+def evol_binary(t_nat, y_nat_vect, par):
+    # parse parameters
+    # 0
+    # 1-6
+    # 7-9
+    # 10-12
+    ai_nat, \
+    Li_nat_x, Li_nat_y, Li_nat_z, ei_x, ei_y, ei_z, \
+    S1_nat_x, S1_nat_y, S1_nat_z, \
+    S2_nat_x, S2_nat_y, S2_nat_z\
+                = y_nat_vect
+    
+    # global par
+    M1, M2, M3, __,\
+    t_unit, Li_unit, __, ai_unit, S1_unit, S2_unit, \
+    br_flag, ss_flag\
+                = par
+    
+    # convert to cgs units
+    ai = ai_nat * ai_unit
+    Li_v = np.array([Li_nat_x, Li_nat_y, Li_nat_z]) * Li_unit
+    S1_v = np.array([S1_nat_x, S1_nat_y, S1_nat_z]) * S1_unit
+    S2_v = np.array([S2_nat_x, S2_nat_y, S2_nat_z]) * S2_unit
+    
+    ei_v = np.array([ei_x, ei_y, ei_z])
+    
+    # scalar quantities that will be useful for the other parts
+    mu_i = M1*M2/(M1+M2)
+    omega_i = np.sqrt(G*(M1+M2)/ai**3.)
+    
+    Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
 
+    ei = np.sqrt(inner(ei_v, ei_v))
+    eff_i = np.sqrt(1.-ei**2.)
+    
+    S1 = np.sqrt(inner(S1_v, S1_v))
+    S2 = np.sqrt(inner(S2_v, S2_v))
+    
+    # unity vectors
+    uLi_v = Li_v / (Li_e0 * eff_i)
+    uS1_v = S1_v / S1
+    uS2_v = S2_v / S2
+    
+    # get GR & GW terms
+    y_orb_vect = np.array([ai, \
+                           Li_v[0], Li_v[1], Li_v[2], \
+                           ei_v[0], ei_v[1], ei_v[2]])
+    par_GR = np.array([mu_i, omega_i,\
+                       Li_e0, ei, eff_i,\
+                       uLi_v[0], uLi_v[1], uLi_v[2]])
+
+    dai,\
+    dLi_GR_x, dLi_GR_y, dLi_GR_z, \
+    dei_GR_x, dei_GR_y, dei_GR_z\
+        = get_dy_orb_GR_GW(y_orb_vect, par, par_GR)
+        
+    # get SL & SS terms
+    y_SP_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                          ei_v[0], ei_v[1], ei_v[2], \
+                          S1_v[0], S1_v[1], S1_v[2], \
+                          S2_v[0], S2_v[1], S2_v[2]])
+    par_SP = np.array([mu_i, omega_i, ai, \
+                        Li_e0, ei, eff_i, S1, S2, \
+                        uLi_v[0], uLi_v[1], uLi_v[2], \
+                        uS1_v[0], uS1_v[1], uS1_v[2], \
+                        uS2_v[0], uS2_v[1], uS2_v[2]])
+    
+    dLi_SP_x, dLi_SP_y, dLi_SP_z, \
+    dei_SP_x, dei_SP_y, dei_SP_z, \
+    dS1_SP_x, dS1_SP_y, dS1_SP_z, \
+    dS2_SP_x, dS2_SP_y, dS2_SP_z\
+        = get_dy_SP(y_SP_vect, par, par_SP)
+            
+    # total 
+    # GW of semi-major axis
+    dai_nat = dai / ai_unit
+    
+    # inner orb sees GR&GW + SP back reaction; no LK anymore
+    dLi_nat_x = (dLi_GR_x + dLi_SP_x) / Li_unit
+    dLi_nat_y = (dLi_GR_y + dLi_SP_y) / Li_unit
+    dLi_nat_z = (dLi_GR_z + dLi_SP_z) / Li_unit
+    dei_x = dei_GR_x + dei_SP_x
+    dei_y = dei_GR_y + dei_SP_y
+    dei_z = dei_GR_z + dei_SP_z
+    
+    # S1/S2 sees SP (de Sitter & Lense-Thirring)
+    dS1_nat_x = dS1_SP_x / S1_unit
+    dS1_nat_y = dS1_SP_y / S1_unit
+    dS1_nat_z = dS1_SP_z / S1_unit
+    dS2_nat_x = dS2_SP_x / S2_unit
+    dS2_nat_y = dS2_SP_y / S2_unit
+    dS2_nat_z = dS2_SP_z / S2_unit
+    
+    dy_nat_vect = np.array([\
+            dai_nat, \
+            dLi_nat_x, dLi_nat_y, dLi_nat_z, dei_x, dei_y, dei_z, \
+            dS1_nat_x, dS1_nat_y, dS1_nat_z, \
+            dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
+    return dy_nat_vect
+
+
+@jit(nopython=True)
+def inner(xx, yy):
+    return np.sum(xx*yy)
+
+@jit(nopython=True)
+def cross(xx, yy):
+    zz=np.array([\
+         xx[1]*yy[2] - xx[2]*yy[1], \
+         xx[2]*yy[0] - xx[0]*yy[2], \
+         xx[0]*yy[1] - xx[1]*yy[0]
+                ])
+    return zz
