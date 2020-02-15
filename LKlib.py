@@ -18,6 +18,7 @@ def get_inst_t_gw_from_a_orb(M1, M2, a_orb, e):
     t_gw = 1./inv_t_gw
     return t_gw
 
+
 @jit(nopython=True, fastmath=True)
 def get_t_lk(M1, M2, M3, ai, ao):
     omega_i = np.sqrt(G*(M1+M2)/ai**3.)
@@ -404,15 +405,16 @@ def evol_binary(t_nat, y_nat_vect, par):
     omega_i = np.sqrt(G*(M1+M2)/ai**3.)
     
     Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
+    Li = np.sqrt(inner(Li_v, Li_v))
 
     ei = np.sqrt(inner(ei_v, ei_v))
-    eff_i = np.sqrt(1.-ei**2.)
+    eff_i = Li/Li_e0
     
     S1 = np.sqrt(inner(S1_v, S1_v))
     S2 = np.sqrt(inner(S2_v, S2_v))
     
     # unity vectors
-    uLi_v = Li_v / (Li_e0 * eff_i)
+    uLi_v = Li_v / (Li)
     uS1_v = S1_v / S1
     uS2_v = S2_v / S2
     
@@ -473,7 +475,6 @@ def evol_binary(t_nat, y_nat_vect, par):
             dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
     return dy_nat_vect
 
-
 @jit(nopython=True)
 def inner(xx, yy):
     return np.sum(xx*yy)
@@ -486,3 +487,110 @@ def cross(xx, yy):
          xx[0]*yy[1] - xx[1]*yy[0]
                 ])
     return zz
+
+@jit(nopython=True)
+def evol_aLe(t_nat, y_nat_vect, par):
+    a_nat, L_nat, e_orb = y_nat_vect
+    M1, M2, t_unit, a_unit, L_unit = par
+
+    Mt=M1+M2
+    mu=M1*M2/Mt
+    
+    a_orb = a_nat*a_unit
+    L_orb = L_nat * L_unit
+    eff = np.sqrt(1.-e_orb**2.)
+    
+    G3_c5 = G**3./c**5.
+    e2 = e_orb**2.
+    e4 = e_orb**4.
+    da = - (64./5.*G3_c5) * (mu*(M1+M2)**2./(a_orb**3.))\
+          * (1. + 73./24.*e2 + 37./96.*e4)/(eff_i**7.)    
+    dL = - (32./5.*G3_c5*np.sqrt(G)) * mu**2.*(M1+M2)**2.5 / (a_orb**3.5) \
+          * (1.+0.875*e2)/(eff**4.)
+    de = - (304./15.*G3_c5) * mu*(M1+M2)**2./(a_orb**4.)\
+          * (1.+121./304.*e2)/(eff**5.)
+    
+    dy_nat_vect = np.array([\
+        da/a_unit, dL/L_unit, de])*t_unit
+    return dy_nat_vect
+
+@jit(nopython=True)
+def get_angles(J, L, e, S, par):
+    M1, M2, S1, S2, chi_eff = par
+    
+    qq=M2/M1
+    Mt=M1+M2
+    
+    c_th1 = 0.5 * 1./((1.-qq)*S1) * \
+        ((J**2. - L**2. - S**2.)/L  - 2.*qq*G*Mt**2./c*chi_eff/(1.+qq))
+    c_th2 = 0.5 * qq/((1.-qq)*S2) * \
+        (-(J**2.-L**2.-S**2.)/L + 2.*G*Mt**2./c*chi_eff/(1.+qq))
+    c_th12 = (S**2. - S1**2. -S2**2.)/(2.*S1*S2)
+    
+    th1, th2, th12 = np.arccos(c_th1), np.arccos(c_th2), np.arccos(c_th12)
+    c_dphi = (c_th12 - c_th1*c_th2)/(np.sin(th1) * np.sin(th2))
+    dphi = np.arccos(c_dphi)
+    return th1, th2, th12, dphi
+
+@jit(nopython=True)
+def get_dSdt(J, L, e, S, par):
+    M1, M2, S1, S2, chi_eff = par
+    
+    qq=M2/M1
+    Mt=M1+M2
+    mu=M1*M2/Mt
+    eta=mu/Mt
+    eff = np.sqrt(1.-e**2.)
+    
+    th1, th2, th12, dphi = get_angles(J, L, e, S, par)
+    
+    dSdt = 1.5*eta**6. * eff**3. * (1-qq**2.)/qq * ((G*Mt**2./c)/L)**5.\
+        * (c**3./G/Mt) * (S1*S2/S)\
+        * (-1. + 0.5*qq/(1.-qq)**2.*(J**2.-L**2.-S**2.)/L**2. \
+          - 2.*qq**2./(1.-qq**2.)**2.*G*Mt**2./c/L*chi_eff)\
+        * np.sin(th1) * np.sin(th2) * np.sin(dphi)
+    return dSdt
+
+def find_Smp(J, L, e, par, nPt=500):
+    M1, M2, S1, S2, chi_eff = par
+    qq=M2/M1
+    Mt=M1+M2
+    St_unit = G*Mt**2./c
+    
+    S_min = np.max([np.abs(J-L), np.abs(S1-S2)])
+    S_max = np.min([J+L, S1+S2])
+    S_vect = np.linspace(S_min, S_max, nPt)
+    
+    A1=np.sqrt(J**2. - (L-S_vect)**2.)
+    A2=np.sqrt((L+S_vect)**2. - J**2.)
+    A3=np.sqrt(S_vect**2. - (S1-S2)**2.)
+    A4=np.sqrt((S1+S2)**2. - S_vect**2.)
+    
+    chi_vect1 = ((J**2.-L**2.-S_vect**2.)\
+                *((S_vect**2.*(1.+qq)**2.)\
+                  -(S1**2.-S2**2.)*(1.-qq**2.))\
+                 -(1.-qq**2.)*A1*A2*A3*A4)\
+            /(4.*qq*St_unit*S_vect**2.*L)
+
+    chi_vect2 = ((J**2.-L**2.-S_vect**2.)\
+                *((S_vect**2.*(1.+qq)**2.)\
+                  -(S1**2.-S2**2.)*(1.-qq**2.))\
+                 +(1.-qq**2.)*A1*A2*A3*A4)\
+            /(4.*qq*St_unit*S_vect**2.*L)
+    
+    S_vs_chi_func1 = interp.interp1d(chi_vect1, S_vect)
+    S_vs_chi_func2 = interp.interp1d(chi_vect2, S_vect) 
+    
+    Sm = S_vs_chi_func1(chi_eff)
+    Sp = S_vs_chi_func2(chi_eff)
+    return Sm, Sp
+    
+
+def get_tau_pre(J, L, e, par, nPt=500):
+    M1, M2, S1, S2, chi_eff = par
+
+    Sm, Sp = find_Smp(J, L, e, par)
+    S_vect = np.linspace(Sm, Sp, nPt)
+    dSdt_vect = get_dSdt(J, L, e, S_vect, par)
+    tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect), S_vect)
+    return tau_pre       
