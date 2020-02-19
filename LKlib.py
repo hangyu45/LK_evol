@@ -9,11 +9,13 @@ from numba import jit, prange
 
 from myConstants import *
 
-@jit(nopython=True, fastmath=True)
 def get_inst_t_gw_from_a_orb(M1, M2, a_orb, e):
     Mt=M1+M2
     mu=M1*M2/(M1+M2)
-    inv_t_gw = (64./5.)*(G**3./c**5.)*mu*Mt**2./a_orb**4. \
+    
+    G3muMt2_c5a3 = (G*mu/c**2./a_orb) * (G*Mt/c**2./a_orb)**2. * c
+    
+    inv_t_gw = (64./5.)*(G3muMt2_c5a3/a_orb) \
                 * (1.+73./24.*e**2+37./96.*e**4.)/(1.-e**2.)**(3.5)
     t_gw = 1./inv_t_gw
     return t_gw
@@ -52,14 +54,14 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     # scalars
     omega_GR = 3.*G*(M1+M2)/(c**2.*ai*eff_i**2.) * omega_i
     
-    G3_c5 = G**3./c**5.
+    G3muMt2_c5a3 = (G*mu_i/c**2./ai) * (G*(M1+M2)/c**2./ai)**2. * c
     ei2 = ei**2.
     ei4 = ei**4.
-    dai = - (64./5.*G3_c5) * (mu_i*(M1+M2)**2./(ai**3.))\
+    dai = - (64./5.) * (G3muMt2_c5a3)\
           * (1. + 73./24.*ei2 + 37./96.*ei4)/(eff_i**7.)    
-    dLi_GW = - (32./5.*G3_c5*np.sqrt(G)) * mu_i**2.*(M1+M2)**2.5 / (ai**3.5) \
+    dLi_GW = - (32./5.)*G3muMt2_c5a3*np.sqrt(G) * mu_i*np.sqrt(M1+M2) / np.sqrt(ai) \
           * (1.+0.875*ei2)/(eff_i**4.)
-    dei_GW = - (304./15.*G3_c5) * mu_i*(M1+M2)**2./(ai**4.)\
+    dei_GW = - (304./15.) * G3muMt2_c5a3/ai\
           * (1.+121./304.*ei2)/(eff_i**5.)
         
     # vectors
@@ -489,30 +491,54 @@ def cross(xx, yy):
     return zz
 
 @jit(nopython=True)
-def evol_aLe(t_nat, y_nat_vect, par):
-    a_nat, L_nat, e_orb = y_nat_vect
-    M1, M2, t_unit, a_unit, L_unit = par
-
+def evol_log_aL(t_nat, logy_vect, par_aL):
+    loga, logL = logy_vect
+    M1, M2, t_unit= par_aL
     Mt=M1+M2
     mu=M1*M2/Mt
     
-    a_orb = a_nat*a_unit
-    L_orb = L_nat * L_unit
-    eff = np.sqrt(1.-e_orb**2.)
+    a_orb = np.exp(loga)
+    L_orb = np.exp(logL)
+    eff = L_orb/(mu*np.sqrt(G*Mt*a_orb))
+    e_orb = np.sqrt(1.-eff**2.)
     
     G3_c5 = G**3./c**5.
     e2 = e_orb**2.
     e4 = e_orb**4.
+    
     da = - (64./5.*G3_c5) * (mu*(M1+M2)**2./(a_orb**3.))\
-          * (1. + 73./24.*e2 + 37./96.*e4)/(eff_i**7.)    
+          * (1. + 73./24.*e2 + 37./96.*e4)/(eff**7.)    
     dL = - (32./5.*G3_c5*np.sqrt(G)) * mu**2.*(M1+M2)**2.5 / (a_orb**3.5) \
           * (1.+0.875*e2)/(eff**4.)
-    de = - (304./15.*G3_c5) * mu*(M1+M2)**2./(a_orb**4.)\
-          * (1.+121./304.*e2)/(eff**5.)
     
-    dy_nat_vect = np.array([\
-        da/a_unit, dL/L_unit, de])*t_unit
-    return dy_nat_vect
+    dlogy_vect = np.array([da/a_orb, dL/L_orb]) * t_unit
+    return dlogy_vect
+
+def evol_logL_vs_loga(loga_Mt, logL_Mt, par_aL):
+    M1, M2= par_aL
+    Mt=M1+M2
+    mu=M1*M2/Mt
+    
+    r_Mt = G*Mt/c**2.
+    S_Mt = G*Mt**2./c
+    
+    a_orb = np.exp(loga_Mt)*r_Mt
+    L_orb = np.exp(logL_Mt)*S_Mt
+    eff = L_orb/(mu*np.sqrt(G*Mt*a_orb))
+    e_orb = np.sqrt(1.-eff**2.)
+    
+    G3muMt2_c5a3 = (G*mu/c**2./a_orb) * (G*Mt/c**2./a_orb)**2. * c #G**3.*mu*Mt**2./c**5./a_orb**3.
+    e2 = e_orb**2.
+    e4 = e_orb**4.
+    
+    da = - (64./5.) * (G3muMt2_c5a3)\
+          * (1. + 73./24.*e2 + 37./96.*e4)/(eff**7.)    
+    dL = - (32./5.*G3muMt2_c5a3*np.sqrt(G)) * mu *np.sqrt(M1+M2) / np.sqrt(a_orb) \
+          * (1.+0.875*e2)/(eff**4.)
+    
+    dLda = dL/da
+    dlogL_dloga = a_orb/L_orb * dL/da
+    return dlogL_dloga
 
 @jit(nopython=True)
 def get_angles(J, L, e, S, par):
@@ -551,11 +577,11 @@ def get_dSdt(J, L, e, S, par):
         * np.sin(th1) * np.sin(th2) * np.sin(dphi)
     return dSdt
 
-def find_Smp(J, L, e, par, nPt=500):
+def find_Smp(J, L, e, par, nPt=100):
     M1, M2, S1, S2, chi_eff = par
     qq=M2/M1
     Mt=M1+M2
-    St_unit = G*Mt**2./c
+    S_unit = G*Mt**2./c
     
     S_min = np.max([np.abs(J-L), np.abs(S1-S2)])
     S_max = np.min([J+L, S1+S2])
@@ -570,27 +596,133 @@ def find_Smp(J, L, e, par, nPt=500):
                 *((S_vect**2.*(1.+qq)**2.)\
                   -(S1**2.-S2**2.)*(1.-qq**2.))\
                  -(1.-qq**2.)*A1*A2*A3*A4)\
-            /(4.*qq*St_unit*S_vect**2.*L)
+            /(4.*qq*S_unit*S_vect**2.*L)
 
     chi_vect2 = ((J**2.-L**2.-S_vect**2.)\
                 *((S_vect**2.*(1.+qq)**2.)\
                   -(S1**2.-S2**2.)*(1.-qq**2.))\
                  +(1.-qq**2.)*A1*A2*A3*A4)\
-            /(4.*qq*St_unit*S_vect**2.*L)
+            /(4.*qq*S_unit*S_vect**2.*L)
     
-    S_vs_chi_func1 = interp.interp1d(chi_vect1, S_vect)
-    S_vs_chi_func2 = interp.interp1d(chi_vect2, S_vect) 
+    # note here is S vs chi-chi_eff!
+    chi_vs_S_func1 = interp.interp1d(S_vect, chi_vect1-chi_eff)
+    chi_vs_S_func2 = interp.interp1d(S_vect, chi_vect2-chi_eff)
     
-    Sm = S_vs_chi_func1(chi_eff)
-    Sp = S_vs_chi_func2(chi_eff)
+    idx1 = np.argmin(chi_vect1)
+    idx2 = np.argmax(chi_vect2)
+    
+    if np.max(chi_vect1) < chi_eff:
+        Sm = opt.ridder(chi_vs_S_func2, S_min, S_vect[idx2])
+        Sp = opt.ridder(chi_vs_S_func2, S_vect[idx2], S_max)
+    elif np.min(chi_vect2) > chi_eff:
+        Sm = opt.ridder(chi_vs_S_func1, S_min, S_vect[idx1])
+        Sp = opt.ridder(chi_vs_S_func1, S_vect[idx1], S_max)
+    else:
+        try:
+            Sm = opt.ridder(chi_vs_S_func1, S_min, S_vect[idx1])
+        except ValueError:
+            Sm = opt.ridder(chi_vs_S_func1, S_vect[idx1], S_max)
+        try:
+            Sp = opt.ridder(chi_vs_S_func2, S_vect[idx2], S_max)
+        except ValueError:
+            Sp = opt.ridder(chi_vs_S_func2, S_min, S_vect[idx2])
+            
+    if Sm>Sp:
+        Sm, Sp = Sp, Sm
     return Sm, Sp
+
+def find_S_chi_contour(J, L, e, par, nPt=100):
+    M1, M2, S1, S2, chi_eff = par
+    qq=M2/M1
+    Mt=M1+M2
+    S_unit = G*Mt**2./c
+    
+    S_min = np.max([np.abs(J-L), np.abs(S1-S2)])
+    S_max = np.min([J+L, S1+S2])
+    S_vect = np.linspace(S_min, S_max, nPt)
+    
+    A1=np.sqrt(J**2. - (L-S_vect)**2.)
+    A2=np.sqrt((L+S_vect)**2. - J**2.)
+    A3=np.sqrt(S_vect**2. - (S1-S2)**2.)
+    A4=np.sqrt((S1+S2)**2. - S_vect**2.)
+    
+    chi_vect1 = ((J**2.-L**2.-S_vect**2.)\
+                *((S_vect**2.*(1.+qq)**2.)\
+                  -(S1**2.-S2**2.)*(1.-qq**2.))\
+                 -(1.-qq**2.)*A1*A2*A3*A4)\
+            /(4.*qq*S_unit*S_vect**2.*L)
+
+    chi_vect2 = ((J**2.-L**2.-S_vect**2.)\
+                *((S_vect**2.*(1.+qq)**2.)\
+                  -(S1**2.-S2**2.)*(1.-qq**2.))\
+                 +(1.-qq**2.)*A1*A2*A3*A4)\
+            /(4.*qq*S_unit*S_vect**2.*L)
+    
+    return S_vect, chi_vect1, chi_vect2
     
 
-def get_tau_pre(J, L, e, par, nPt=500):
+def get_tau_pre(J, L, e, par, nPt=100):
     M1, M2, S1, S2, chi_eff = par
 
     Sm, Sp = find_Smp(J, L, e, par)
     S_vect = np.linspace(Sm, Sp, nPt)
     dSdt_vect = get_dSdt(J, L, e, S_vect, par)
     tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect), S_vect)
-    return tau_pre       
+    return tau_pre 
+
+def evol_J_avg(L_nat, J_nat, e_vs_L_func, par, nPt=100):
+    M1, M2, S1, S2, chi_eff = par
+    
+    Mt=M1+M2
+    r_Mt = G*Mt/c**2.
+    S_Mt = G*Mt**2./c
+    
+    L=L_nat * S_Mt
+    J=J_nat * S_Mt
+    
+    e_orb = e_vs_L_func(L)
+    
+    Sm, Sp = find_Smp(J, L, e_orb, par, nPt=nPt)
+    S_vect = np.linspace(Sm, Sp, nPt)
+    dSdt_vect = np.abs(get_dSdt(J, L, e_orb, S_vect, par))
+    
+    c_th_L = (J**2.+L**2.-S_vect**2.)/(2*J*L)
+    tau = 2.*integ.trapz(S_Mt/dSdt_vect, S_vect/S_Mt)
+    dJdL = 2./tau * integ.trapz(S_Mt*c_th_L/dSdt_vect, S_vect/S_Mt)
+    return dJdL
+
+
+def evol_J_avg_backup(L_nat, J_nat, e_vs_L_func, par, nPt=100):
+    M1, M2, S1, S2, chi_eff = par
+    
+    Mt=M1+M2
+    mu=M1*M2/Mt
+    eta = M1*M2/Mt**2.
+    
+    r_Mt = G*Mt/c**2.
+    S_Mt = G*Mt**2./c
+    
+    L=L_nat * S_Mt
+    J=J_nat * S_Mt
+    
+    e_orb = e_vs_L_func(L)
+    a_orb = L**2./(G*mu**2.*Mt*(1.-e_orb**2.))
+    
+    t_gw = get_inst_t_gw_from_a_orb(M1, M2, a_orb, e_orb)
+    
+    Sm, Sp = find_Smp(J, L, e_orb, par, nPt=nPt)
+    S_vect = np.linspace(Sm, Sp, nPt)
+    dSdt_vect = np.abs(get_dSdt(J, L, e_orb, S_vect, par))
+    
+    inv_t_pre = np.abs(dSdt_vect/(S_vect+1.e-9*np.ones(nPt)*S_Mt))
+    if np.min(inv_t_pre)<(1./t_gw):
+        idx = np.argmin(inv_t_pre)
+        S = S_vect[idx]
+        c_th_L = (J**2.+L**2.-S**2.)/(2*J*L)
+        dJdL = c_th_L
+    else:
+        c_th_L = (J**2.+L**2.-S_vect**2.)/(2*J*L)
+        tau = 2.*integ.trapz(S_Mt/dSdt_vect, S_vect/S_Mt)
+        dJdL = 2./tau * integ.trapz(S_Mt*c_th_L/dSdt_vect, S_vect/S_Mt)
+    return dJdL
+
