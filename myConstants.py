@@ -4,9 +4,9 @@ import numpy as np
 G=6.67259e-8
 c=2.99792458e10
 hbar=6.6260755e-27/2./np.pi
-k=1.380658e-16
-sigma=5.67051e-5
-a=4.*sigma/c
+kb=1.380658e-16
+sigma_sb=5.67051e-5
+a=4.*sigma_sb/c
 
 keV2erg=1.6021773e-9
 eV2K = 1.16045e+4
@@ -20,7 +20,7 @@ pc=3.0857e18
 Ms=1.989e33
 Rs=6.958e10
 Ts=5770.
-Ls=4.0*np.pi*Rs**2.0*sigma*Ts**4.0
+Ls=4.0*np.pi*Rs**2.0*sigma_sb*Ts**4.0
 
 P_yr=86400.0*365.25
 
@@ -45,7 +45,7 @@ kappa_T_e = theta_T_e/me # opacity due to Thomson scattering
 
 # proton
 mp=1.67262178e-24
-e=4.803e-10 # in esu
+e_esu=4.803e-10 # in esu
 rp=1.e-13
 
 mn=1.674927471e-24

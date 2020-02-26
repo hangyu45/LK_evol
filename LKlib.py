@@ -514,6 +514,7 @@ def evol_log_aL(t_nat, logy_vect, par_aL):
     dlogy_vect = np.array([da/a_orb, dL/L_orb]) * t_unit
     return dlogy_vect
 
+@jit(nopython=True)
 def evol_logL_vs_loga(loga_Mt, logL_Mt, par_aL):
     M1, M2= par_aL
     Mt=M1+M2
@@ -577,7 +578,7 @@ def get_dSdt(J, L, e, S, par):
         * np.sin(th1) * np.sin(th2) * np.sin(dphi)
     return dSdt
 
-def find_Smp(J, L, e, par, nPt=100):
+def find_Smp(J, L, e, par, nPt=8000):
     M1, M2, S1, S2, chi_eff = par
     qq=M2/M1
     Mt=M1+M2
@@ -631,7 +632,7 @@ def find_Smp(J, L, e, par, nPt=100):
         Sm, Sp = Sp, Sm
     return Sm, Sp
 
-def find_S_chi_contour(J, L, e, par, nPt=100):
+def find_S_chi_contour(J, L, e, par, nPt=1000):
     M1, M2, S1, S2, chi_eff = par
     qq=M2/M1
     Mt=M1+M2
@@ -660,26 +661,23 @@ def find_S_chi_contour(J, L, e, par, nPt=100):
     
     return S_vect, chi_vect1, chi_vect2
     
-
-def get_tau_pre(J, L, e, par, nPt=100):
+def get_tau_pre(J, L, e, par, nPt=1000):
     M1, M2, S1, S2, chi_eff = par
 
     Sm, Sp = find_Smp(J, L, e, par)
     S_vect = np.linspace(Sm, Sp, nPt)
     dSdt_vect = get_dSdt(J, L, e, S_vect, par)
     tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect), S_vect)
-    return tau_pre 
+    return tau_pre    
 
-def evol_J_avg(L_nat, J_nat, e_vs_L_func, par, nPt=100):
+def evol_J_avg(L_nat, J_nat, e_vs_L_func, par, nPt=8000):
     M1, M2, S1, S2, chi_eff = par
     
     Mt=M1+M2
-    r_Mt = G*Mt/c**2.
     S_Mt = G*Mt**2./c
     
     L=L_nat * S_Mt
     J=J_nat * S_Mt
-    
     e_orb = e_vs_L_func(L)
     
     Sm, Sp = find_Smp(J, L, e_orb, par, nPt=nPt)

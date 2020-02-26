@@ -22,14 +22,14 @@ plt.rcParams.update({'text.usetex': False,
                      'mathtext.fontset': 'cm',
                      'lines.linewidth': 2.5,
                      'font.size': 20,
-                     'xtick.labelsize': 'medium',
-                     'ytick.labelsize': 'medium',
+                     'xtick.labelsize': 'large',
+                     'ytick.labelsize': 'large',
                      'xtick.direction': 'in',
                      'ytick.direction': 'in',
                      'axes.labelsize': 'large',
                      'axes.titlesize': 'large',
-                     'axes.grid': True,
-                     'grid.alpha': 0.73,
+                     'axes.grid': False,
+                     'grid.alpha': 0.5,
                      'lines.markersize': 12,
                      'legend.borderpad': 0.2,
                      'legend.fancybox': True,
@@ -38,6 +38,8 @@ plt.rcParams.update({'text.usetex': False,
                      'legend.handletextpad': 0.5,
                      'legend.labelspacing': 0.2,
                      'legend.loc': 'best',
+                     'savefig.bbox': 'tight',
+                     'savefig.pad_inches': 0.05,
                      'savefig.dpi': 80,
                      'pdf.compression': 9})
 
@@ -58,6 +60,7 @@ parser.add_argument('--ai-0', type=np.float, default=100.,
                    help='Initial semi-major axis of the inner orbit in [AU]')
 parser.add_argument('--atol', type=np.float, default=1e-9)
 parser.add_argument('--rtol', type=np.float, default=1e-9)
+parser.add_argument('--plot-flag', type=np.int, default=0)
 
 kwargs = parser.parse_args()
 # convert it to a dict
@@ -67,6 +70,7 @@ run_id=kwargs['run_id']
 M3, ao, ai_0=kwargs['M3'], kwargs['ao'], kwargs['ai_0']
 atol, rtol = kwargs['atol'], kwargs['rtol']
 br_flag, ss_flag=1, 1
+plot_flag = kwargs['plot_flag']
 
 fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/M3_%.1e_ao_%.1epc_ai0_%.1eAU/'\
             %(M3, ao, ai_0)
@@ -311,7 +315,7 @@ int_func=lambda loga_, logL_:\
     LK.evol_logL_vs_loga(loga_, logL_, par_aL)
     
 sol=integ.solve_ivp(int_func, \
-        t_span=(np.log(a_LK/r_Mt), np.log(6.)), y0=np.array([np.log(L_LK/S_Mt)]), rtol=3e-14, atol=1e-12)
+        t_span=(np.log(a_LK/r_Mt), np.log(6.)), y0=np.array([np.log(L_LK/S_Mt)]), rtol=3e-14, atol=1e-17)
 
 a_scal = np.exp(sol.t)*r_Mt
 L_scal = np.exp(sol.y[0, :])*S_Mt
@@ -329,37 +333,37 @@ L_vs_a_func=lambda aa: np.exp(interp.splev(np.log(aa), logL_vs_loga_tck))
 ### J vs L func
 #######################################################################
 
-nPt = 100
+nPt = 50
 par_JL = np.array([M1, M2, S1, S2, chi_eff])
 int_func=lambda L_nat_, J_nat_:\
     LK.evol_J_avg(L_nat_, J_nat_, e_vs_L_func, par_JL, nPt=nPt)
 
 #######################################################################
-### evol to 1000 r_Mt
+### evol to 600 r_Mt
 #######################################################################
 
 t_run0 = timeit.default_timer()
 
-L_1kM = L_vs_a_func(1000.*r_Mt)
-e_1kM = e_vs_L_func(L_1kM)
+L_600 = L_vs_a_func(1000.*r_Mt)
+e_600 = e_vs_L_func(L_600)
 sol=integ.solve_ivp(int_func, \
-    t_span=(L_LK/S_Mt, L_1kM/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=3e-12)
+    t_span=(L_LK/S_Mt, L_600/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=1e-12)
 
-J_1kM = sol.y[0,-1] * S_Mt
-print('r = 1000 M')
-print('J, L, e', J_1kM/S_Mt, L_1kM/S_Mt, e_1kM)
+J_600 = sol.y[0,-1] * S_Mt
+print('r = 600 M')
+print('J, L, e', J_600/S_Mt, L_600/S_Mt, e_600)
 
-Sm_1kM, Sp_1kM=LK.find_Smp(J_1kM, L_1kM, e_1kM, par_JL)
+Sm_600, Sp_600=LK.find_Smp(J_600, L_600, e_600, par_JL)
 
-fid = open(data_dir + prefix + 'r_1kM_cond.txt', 'a')
+fid = open(data_dir + prefix + 'r_600_cond.txt', 'a')
 fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, 
-            J_1kM/S_Mt, L_1kM/S_Mt, e_1kM, 
-            Sm_1kM/S_Mt, Sp_1kM/S_Mt))
+            J_600/S_Mt, L_600/S_Mt, e_600, 
+            Sm_600/S_Mt, Sp_600/S_Mt))
 fid.close()
 
 t_run1 = timeit.default_timer()
-print('dJdL run (to 1000 M):', t_run1 - t_run0)
+print('dJdL run (to 600 M):', t_run1 - t_run0)
 
 #######################################################################
 ### evol to ISCO
@@ -370,7 +374,7 @@ t_run0 = timeit.default_timer()
 L_isco = L_vs_a_func(6.*r_Mt)
 e_isco = e_vs_L_func(L_isco)
 sol=integ.solve_ivp(int_func, \
-    t_span=(L_LK/S_Mt, L_isco/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-13, atol=1e-14)
+    t_span=(L_LK/S_Mt, L_isco/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-14, atol=1e-17)
 
 J_isco = sol.y[0,-1] * S_Mt
 print('r = 6 M')
@@ -388,55 +392,87 @@ fid.close()
 t_run1 = timeit.default_timer()
 print('dJdL run (to 6 M):', t_run1 - t_run0)
 
-## plot the dJ/dL evolution tracks
-LL, JJ = sol.t*S_Mt, sol.y[0, :]*S_Mt
-ee = e_vs_L_func(LL)
-aa = LL**2./(mu_i**2.*G*(M1+M2)*(1.-ee**2.))
-nLL = len(LL)
+#######################################################################
+### plot some results for debugging
+#######################################################################
 
-dJdL, dJdLm, dJdLp = np.zeros(nLL), np.zeros(nLL), np.zeros(nLL)
-for i in range(nLL):
-    dJdL[i] = int_func(LL[i]/S_Mt, JJ[i]/S_Mt)
+if plot_flag>0:
+    ## plot the dJ/dL evolution tracks
+    LL, JJ = sol.t*S_Mt, sol.y[0, :]*S_Mt
+    ee = e_vs_L_func(LL)
+    aa = LL**2./(mu_i**2.*G*(M1+M2)*(1.-ee**2.))
+    nLL = len(LL)
+
+    dJdL, dJdLm, dJdLp = np.zeros(nLL), np.zeros(nLL), np.zeros(nLL)
+    t_pre_m, t_pre_p = np.zeros(nLL), np.zeros(nLL)
+    t_gw = np.zeros(nLL)
+    for i in range(nLL):
+        dJdL[i] = int_func(LL[i]/S_Mt, JJ[i]/S_Mt)
     
-    SSm, SSp = LK.find_Smp(JJ[i], LL[i], e_vs_L_func(LL[i]), par_JL, nPt)
-    dJdLm[i] = (JJ[i]**2. + LL[i]**2. - SSm**2.)/(2.*JJ[i]*LL[i])
-    dJdLp[i] = (JJ[i]**2. + LL[i]**2. - SSp**2.)/(2.*JJ[i]*LL[i])
+        SSm, SSp = LK.find_Smp(JJ[i], LL[i], ee[i], par_JL, nPt)
+        dJdLm[i] = (JJ[i]**2. + LL[i]**2. - SSm**2.)/(2.*JJ[i]*LL[i])
+        dJdLp[i] = (JJ[i]**2. + LL[i]**2. - SSp**2.)/(2.*JJ[i]*LL[i])
     
-fig=plt.figure()
-ax=fig.add_subplot(211)
-ax.plot(aa/r_Mt, dJdL, label=r'$<\frac{{\rm d}J}{{\rm d}L}>$')
-ax.fill_between(aa/r_Mt, dJdLp, dJdLm, color='tab:grey', alpha=0.5)
-ax.set_ylabel(r'\frac{{\rm d}J}{{\rm d}L}')
-ax.set_xscale('log')
+        dSdt_m = np.abs(LK.get_dSdt(JJ[i], LL[i], ee[i], SSm, par_JL))
+        dSdt_p = np.abs(LK.get_dSdt(JJ[i], LL[i], ee[i], SSp, par_JL))
+    
+        t_pre_m[i] = SSm/dSdt_m
+        t_pre_p[i] = SSp/dSdt_p
+        t_gw[i]=LK.get_inst_t_gw_from_a_orb(M1, M2, aa[i], ee[i])
+    
+    fig=plt.figure()
+    ax=fig.add_subplot(211)
+    ax.plot(aa/r_Mt, dJdL, label=r'$<\frac{{\rm d}J}{{\rm d}L}>$')
+    ax.fill_between(aa/r_Mt, dJdLp, dJdLm, color='tab:grey', alpha=0.5)
+    ax.set_ylabel(r'\frac{{\rm d}J}{{\rm d}L}')
+    ax.set_xscale('log')
 
-ax=fig.add_subplot(212)
-ax.plot(aa/r_Mt, (dJdLm-dJdLp)/dJdL)
-ax.set_xscale('log')
-ax.set_ylabel('Fractional Variation')
-ax.set_xlabel(r'$a/M_{\rm t}$')
-plt.savefig(fig_dir + prefix + 'dJdL_evol.pdf')
-plt.close()
+    ax=fig.add_subplot(212)
+    ax.plot(aa/r_Mt, (dJdLm-dJdLp)/dJdL)
+    ax.set_xscale('log')
+    ax.set_ylabel('Fractional Variation')
+    ax.set_xlabel(r'$a/M_{\rm t}$')
+    plt.savefig(fig_dir + prefix + 'dJdL_evol.pdf')
+    plt.close()
 
-## plot the contours
-S_LK, chi1_LK, chi2_LK = LK.find_S_chi_contour(J_LK, L_LK, e_LK, par_JL)
-S_1kM, chi1_1kM, chi2_1kM = LK.find_S_chi_contour(J_1kM, L_1kM, e_1kM, par_JL)
-S_isco, chi1_isco, chi2_isco = LK.find_S_chi_contour(J_isco, L_isco, e_isco, par_JL)
+    fig=plt.figure()
+    ax=fig.add_subplot(111)
+    ax.loglog(aa/r_Mt, t_gw/P_yr, label=r'$t_{\rm gw}$')
+    ax.loglog(aa/r_Mt, t_pre_m/P_yr, label=r'$S/({\rm d}S/{\rm d}t)|_{S_-}$')
+    ax.loglog(aa/r_Mt, t_pre_p/P_yr, label=r'$S/({\rm d}S/{\rm d}t)|_{S_+}$')
+    ax.set_ylim([0.03*np.min(t_gw)/P_yr, 30.*np.max(t_gw)/P_yr])
+    ax.legend(loc='upper left')
+    ax.set_xlabel(r'$a/M_{\rm t}$')
+    ax.set_ylabel(r'Timescales [yr]')
+            
+    ax=ax.twinx()
+    ax.loglog(aa/r_Mt, t_gw/(r_Mt/c), ls='')
+    ax.loglog(aa/r_Mt, t_pre_m/(r_Mt/c), ls='')
+    ax.loglog(aa/r_Mt, t_pre_p/(r_Mt/c), ls='')
+    ax.set_ylim([0.03*np.min(t_gw)/(r_Mt/c), 30.*np.max(t_gw)/(r_Mt/c)])
+    ax.set_ylabel(r'$t/M_{\rm t}$')
+    plt.savefig(fig_dir + prefix + 'timescales.pdf')
 
-fig=plt.figure()
-ax=fig.add_subplot(111)
+    ## plot the contours
+    S_LK, chi1_LK, chi2_LK = LK.find_S_chi_contour(J_LK, L_LK, e_LK, par_JL)
+    S_1kM, chi1_1kM, chi2_1kM = LK.find_S_chi_contour(J_1kM, L_1kM, e_1kM, par_JL)
+    S_isco, chi1_isco, chi2_isco = LK.find_S_chi_contour(J_isco, L_isco, e_isco, par_JL)
 
-ax.plot(S_LK/S_Mt, chi1_LK, color='tab:blue', alpha=0.8, label=r'$a=a_0/30$')
-ax.plot(S_LK/S_Mt, chi2_LK, color='tab:blue', alpha=0.8)
-ax.plot(S_1kM/S_Mt, chi1_1kM, color='tab:orange', alpha=0.8, label=r'$a=10^3 M_{\rm t}$')
-ax.plot(S_1kM/S_Mt, chi2_1kM, color='tab:orange', alpha=0.8)
-ax.plot(S_isco/S_Mt, chi1_isco, color='tab:green', alpha=0.8, label=r'$a=6 M_{\rm t}$')
-ax.plot(S_isco/S_Mt, chi2_isco, color='tab:green', alpha=0.8)
-ax.axhline(chi_eff, color='tab:grey', ls=':', alpha=0.7, label=r'True value of $\chi_{\rm eff}$')
+    fig=plt.figure()
+    ax=fig.add_subplot(111)
 
-ax.legend()
-ax.set_ylabel(r'$\chi_{\rm eff}$')
-ax.set_xlabel(r'$S/M_{\rm t}^2$')
+    ax.plot(S_LK/S_Mt, chi1_LK, color='tab:blue', alpha=0.8, label=r'$a=a_0/30$')
+    ax.plot(S_LK/S_Mt, chi2_LK, color='tab:blue', alpha=0.8)
+    ax.plot(S_1kM/S_Mt, chi1_1kM, color='tab:orange', alpha=0.8, label=r'$a=10^3 M_{\rm t}$')
+    ax.plot(S_1kM/S_Mt, chi2_1kM, color='tab:orange', alpha=0.8)
+    ax.plot(S_isco/S_Mt, chi1_isco, color='tab:green', alpha=0.8, label=r'$a=6 M_{\rm t}$')
+    ax.plot(S_isco/S_Mt, chi2_isco, color='tab:green', alpha=0.8)
+    ax.axhline(chi_eff, color='tab:grey', ls=':', alpha=0.7, label=r'True value of $\chi_{\rm eff}$')
 
-plt.savefig(fig_dir + prefix + 'S_chi_contour.pdf')
-plt.close()
+    ax.legend()
+    ax.set_ylabel(r'$\chi_{\rm eff}$')
+    ax.set_xlabel(r'$S/M_{\rm t}^2$')
+
+    plt.savefig(fig_dir + prefix + 'S_chi_contour.pdf')
+    plt.close()
 
