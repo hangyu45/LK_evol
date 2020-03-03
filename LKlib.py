@@ -20,12 +20,115 @@ def get_inst_t_gw_from_a_orb(M1, M2, a_orb, e):
     t_gw = 1./inv_t_gw
     return t_gw
 
-
 @jit(nopython=True, fastmath=True)
 def get_t_lk(M1, M2, M3, ai, ao):
     omega_i = np.sqrt(G*(M1+M2)/ai**3.)
     t_lk = 1./omega_i * (M1+M2)/M3 * (ao/ai)**3.
     return t_lk
+
+def get_epsilon_GR(M1, M2, M3, ai, ao, eo=0):
+    M12 = M1+M2
+    ep_GR = 3.*(G*M12/c**2./ai) * (M12/M3)*(ao/ai)**3.
+    return ep_GR
+
+def get_epsilon_BR(M1, M2, M3, ai, ao, eo=0):
+    mu_i = M1*M2/(M1+M2)
+    mu_o = (M1+M2)*M3/(M1+M2+M3)
+    ep_BR=(mu_i/mu_o) * np.sqrt((M1+M2)/(M1+M2+M3) * (ai/ao/(1.-eo**2.)))
+    return ep_BR
+
+def find_ei_max_vs_Ii_0(Ii_0, \
+        M1, M2, M3, ai, ao, eo=0):
+    cI0 = np.cos(Ii_0)
+    ep_GR = get_epsilon_GR(M1, M2, M3, ai, ao, eo)
+    ep_BR = get_epsilon_BR(M1, M2, M3, ai, ao, eo)
+    
+    def resi(ei_max):
+        jj = np.sqrt(1.-ei_max**2.)
+        resi = 0.375 * ((jj+1)/jj)\
+            * (5*(cI0+0.5*ep_BR)**2.\
+               - (3.+4.*ep_BR*cI0+2.25*ep_BR**2.)*jj**2.\
+               + (ep_BR**2.*jj**4.))\
+            + ep_GR
+        return resi
+
+    ei_max = opt.ridder(resi, 0., 1.-1.e-18)
+    return ei_max
+
+def find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo=0):
+    ep_GR = get_epsilon_GR(M1, M2, M3, ai, ao, eo)
+    ep_BR = get_epsilon_BR(M1, M2, M3, ai, ao, eo)
+    
+    def resi(ei_lim):
+        jj = np.sqrt(1.-ei_lim**2.)
+        resi = 0.375*(jj+1.)*jj\
+                * (-3. + 0.25*ep_BR**2.*(0.8*jj**2.-1))\
+            + ep_GR
+        return resi
+    
+    ei_lim = opt.ridder(resi, 0., 1.-1.e-18)
+    return ei_lim
+
+def find_Tgw_min_vs_Ii_0(Ii_0, \
+        M1, M2, M3, ai, ao, eo=0):
+    ei_max = find_ei_max_vs_Ii_0(Ii_0, \
+        M1, M2, M3, ai, ao, eo)
+    t_gw_min = get_inst_t_gw_from_a_orb(M1, M2, ai, ei_max)
+    return t_gw_min
+
+def find_Tgw_lim_over_Ii_0(M1, M2, M3, ai, ao, eo=0):
+    ei_lim = find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo)
+    t_gw_lim = get_inst_t_gw_from_a_orb(M1, M2, ai, ei_lim)
+    return t_gw_lim
+
+def find_merger_window(Tgw_trgt, \
+                      M1, M2, M3, ai, ao, eo=0.):
+    def resi(Ii_0):
+        Tgw = find_Tgw_min_vs_Ii_0(Ii_0, \
+            M1, M2, M3, ai, ao, eo)
+        resi = 1.-Tgw/Tgw_trgt
+        return resi
+    ep_GR = get_epsilon_GR(M1, M2, M3, ai, ao, eo)
+    ep_BR = get_epsilon_BR(M1, M2, M3, ai, ao, eo)
+    
+    e_lim = find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo)
+    j_lim = np.sqrt(1.-e_lim**2.)
+    I_lim = 0.5*ep_BR*(0.8*j_lim**2.-1.)
+    I_lim = np.arccos(I_lim)
+    
+    I_mm = 0.1*(-ep_BR\
+                +np.sqrt(ep_BR**2.+60.-80.*ep_GR/3.))
+    I_mm = np.arccos(I_mm)
+    I_pp = 0.1*(-ep_BR\
+                -np.sqrt(ep_BR**2.+60.-80.*ep_GR/3.))
+    I_pp = np.arccos(I_pp)
+#     print(I_mm*180./np.pi, I_pp*180./np.pi)
+    I_m = opt.ridder(resi, I_mm*(1.+1.e-6), I_lim)
+    I_p = opt.ridder(resi, I_lim, I_pp*(1.-1.e-6))
+    return I_m, I_p
+
+def check_LK_exc(M1, M2, M3, ai, ao, eo=0):
+    ep_GR = get_epsilon_GR(M1, M2, M3, ai, ao, eo)
+    ep_BR = get_epsilon_BR(M1, M2, M3, ai, ao, eo)
+    
+    flag = 2.25+3.*ep_BR**2./80. - ep_GR
+    return flag
+
+def check_stability(M1, M2, M3, ai, ao, eo=0):
+    flag =ao/ai - 2.8*(1.-0.3*0.5)*(1.+M3/(M1+M2))**0.4*(1.+eo)**0.4/(1.-eo)**1.2
+    return flag
+
+def check_DA_given_ei_max(ei_max, \
+                          M1, M2, M3, ai, ao, eo=0):
+    M12 = M1+M2
+    M123 = M1+M2+M3
+    
+    omega_i = np.sqrt(G*M12/ai**3.)
+    omega_o = np.sqrt(G*M123/ao**3.)
+    
+    Tlk = 1./omega_i * (M12/M3) * (ao*np.sqrt(1.-eo**2.)/ai)**3.
+    flag = Tlk * np.sqrt(1.-ei_max**2.) - 2.*np.pi/omega_o
+    return flag
 
 
 @jit(nopython=True, fastmath=True)
@@ -87,6 +190,136 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
                     dei_v[0], dei_v[1], dei_v[2]])
     return dy_orb_vect
 
+@jit(nopython=True, fastmath=True)
+def get_dy_orb_noAvg(y_orb_vect, M1, M2):
+    """
+    cf. eq. (2.3) of Lincoln & Will
+    Note that v_vect is not purely tangitial (corresponding to the r*dphidt component) 
+    but contains some radial components due to drdt term
+    """
+    rx, ry, rz, \
+    vx, vy, vz\
+        = y_orb_vect
+    
+    eta = M1*M2/(M1+M2)**2.
+    r_v = np.array([rx, ry, rz])
+    v_v = np.array([vx, vy, vz])
+    
+    r_sq = rx**2. + ry**2. + rz**2.
+    v_sq = vx**2. + vy**2. + vz**2.
+    rr = np.sqrt(r_sq)
+    vv = np.sqrt(v_sq)
+    
+    drdt = (rx*vx+ry*vy+rz*vz)/rr
+    rdphidt = np.sqrt(v_sq-drdt**2.)
+    
+    drdt /= c
+    rdphidt /= c
+    v_sq /= c**2.
+    
+    drdt_sq=drdt**2.
+    M_r= G*(M1+M2)/rr/c**2.
+    acc_unit = G*(M1+M2)/r_sq
+    
+    A1 = 2.*(2.+eta)*M_r\
+        - (1.+3*eta)*v_sq\
+        + 1.5*eta*drdt_sq
+    A2 = - 0.75*(12.+29.*eta)*M_r**2.\
+         - eta * (3.-4.*eta)*v_sq**2.\
+         - 15./8.*eta*(1.-3.*eta)*drdt_sq**2.\
+         + 1.5*eta*(3.-4.*eta)*v_sq*drdt_sq\
+         + 0.5*eta*(13.-4.*eta)*M_r*v_sq \
+         + (2.+25.*eta+2.*eta**2.)*M_r*drdt_sq
+        
+    A2p5 = 8./5.*eta*M_r*drdt\
+        * (3.*v_sq + 17./3.*M_r)
+    AA = A1 + A2 + A2p5
+        
+    B1 = 2.*(2.-eta)*drdt
+    B2 = 0.5*drdt*(\
+            eta*(15.+4.*eta)*v_sq\
+          - (4.+41.*eta+8.*eta**2.)*M_r\
+          - 3.*eta*(3.+2.*eta)*drdt_sq )
+    B2p5 = -8./5.*eta*M_r*(6*v_sq-2*M_r-15.*drdt_sq)
+    BB = B1 + B2 + B2p5
+    
+    acc_ur = acc_unit * (-1. + AA)
+    acc_uv= acc_unit * BB
+    
+    a_v = acc_ur*r_v/rr + acc_uv*v_v/c
+       
+    dy_orb_vect = np.array([\
+                    vx, vy, vz, 
+                    a_v[0], a_v[1], a_v[2]
+                           ])
+    return dy_orb_vect
+
+@jit(nopython=True)
+def get_acc_GR(Kep_vect, par):
+    M1, M2, t_unit, r_unit=par
+    eta = M1 * M2/(M1 + M2)**2.
+    
+    r_nat, drdt_nat, phi, dphidt_nat=Kep_vect
+    r = r_nat * r_unit
+    drdt = drdt_nat * r_unit / t_unit
+    dphidt = dphidt_nat / t_unit
+    rdphidt = r*dphidt
+    v_sq = drdt**2. + rdphidt**2.
+    
+    drdt /= c
+    rdphidt /= c
+    v_sq /= c**2.
+    
+    drdt_sq=drdt**2.
+    M_r= G*(M1+M2)/r/c**2.
+    acc_unit = G*(M1+M2)/r**2.
+    
+    A1 = 2.*(2.+eta)*M_r\
+        - (1.+3*eta)*v_sq\
+        + 1.5*eta*drdt_sq
+    A2 = - 0.75*(12.+29.*eta)*M_r**2.\
+         - eta * (3.-4.*eta)*v_sq**2.\
+         - 15./8.*eta*(1.-3.*eta)*drdt_sq**2.\
+         + 1.5*eta*(3.-4.*eta)*v_sq*drdt_sq\
+         + 0.5*eta*(13.-4.*eta)*M_r*v_sq \
+         + (2.+25.*eta+2.*eta**2.)*M_r*drdt_sq
+        
+    A2p5 = 8./5.*eta*M_r*drdt\
+        * (3.*v_sq + 17./3.*M_r)
+    AA = A1 + A2 + A2p5
+        
+    B1 = 2.*(2.-eta)*drdt
+    B2 = 0.5*drdt*(\
+            eta*(15.+4.*eta)*v_sq\
+          - (4.+41.*eta+8.*eta**2.)*M_r\
+          - 3.*eta*(3.+2.*eta)*drdt_sq )
+#     B2p5 = -8./5.*eta*M_r*(v_sq + 3.*M_r)
+    B2p5 = -8./5.*eta*M_r*(6*v_sq-2*M_r-15.*drdt_sq)
+    BB = B1 + B2 + B2p5
+    
+    acc_r = acc_unit * (AA + drdt*BB)
+    acc_phi = acc_unit * (rdphidt*BB)
+    return acc_r, acc_phi
+
+@jit(nopython=True)
+def orb_evol(t_nat, Kep_vect, \
+             acc_r, acc_phi, par):
+    M1, M2, t_unit, r_unit=par
+    GMt=G*(M1+M2)
+    
+    r_nat, drdt_nat, phi, dphidt_nat=Kep_vect
+    r = r_nat * r_unit
+    drdt = drdt_nat * r_unit / t_unit
+    dphidt = dphidt_nat / t_unit
+    
+    ddr = r * dphidt**2. - GMt/r**2. + acc_r
+    ddr_nat = ddr * t_unit**2./r_unit
+    
+    ddphi = -2.*drdt*dphidt/r + acc_phi/r
+    ddphi_nat = ddphi * t_unit**2.
+    
+    dKep=np.array([drdt_nat, ddr_nat, dphidt_nat, ddphi_nat])
+    return dKep
 
 @jit(nopython=True, fastmath=True)
 def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
@@ -121,8 +354,10 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     ei_v  = np.array([ei_x,  ei_y,  ei_z]) 
     uLo_v = np.array([uLo_x, uLo_y, uLo_z])
     
-    ji_d_uLo = inner(ji_v, uLo_v)
-    ei_d_uLo = inner(ei_v, uLo_v)
+#     ji_d_uLo = inner(ji_v, uLo_v)
+#     ei_d_uLo = inner(ei_v, uLo_v)
+    ji_d_uLo=(uLi_x*uLo_x+uLi_y*uLo_y+uLi_z*uLo_z)*eff_i
+    ei_d_uLo=(ei_x*uLo_x+ei_y*uLo_y+ei_z*uLo_z)
     
     ji_c_uLo_v = cross(ji_v, uLo_v)
     ei_c_uLo_v = cross(ei_v, uLo_v)
@@ -148,6 +383,77 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
         ])
     
     return dy_LK_vect
+
+@jit(nopython=True, fastmath=True)
+def get_dy_LK_quad_sa(y_LK_vect, par, par_LK):
+    """
+    Lidov-Kozai under single averaging
+    """
+    # parse input; note that the kep elements for the outer binary is different
+    Li_x, Li_y, Li_z, ei_x, ei_y, ei_z, \
+    ro_x, ro_y, ro_z, vo_x, vo_y, vo_z\
+                = y_LK_vect
+    
+    # global par
+    M1, M2, M3, ao,\
+    t_unit, Li_unit, Lo_unit, ai_unit, S1_unit, S2_unit, \
+    br_flag, ss_flag\
+                = par
+    
+    # par for LK calc
+    mu_i, mu_o, omega_i, ai, \
+    Li_e0, ei, eff_i, \
+    uLi_x, uLi_y, uLi_z \
+                = par_LK
+    
+    # scalar quantities
+    ro = np.sqrt(ro_x**2. + ro_y**2. + ro_z**2.)
+    t_LK = (1./omega_i) * (M1+M2)/M3 * (ro/ai)**3.
+    inv_t_LK_1p5 = 1.5/t_LK
+    
+    phiK = G * (M1+M2)*M3/mu_o / ro
+    phiQ = 0.25*G*M3/ro * (mu_i/mu_o) * (ai/ro)**2.
+    
+    # directional products
+    ji_v  = np.array([uLi_x, uLi_y, uLi_z]) * eff_i
+    ei_v  = np.array([ei_x,  ei_y,  ei_z]) 
+    
+    uro_v = np.array([ro_x, ro_y, ro_z])/ro
+    
+#     ji_d_uro = inner(ji_v, uro_v)
+#     ei_d_uro = inner(ei_v, uro_v)
+    ji_d_uro = (uLi_x*ro_x+uLi_y*ro_y+uLi_z*ro_z)*eff_i/ro
+    ei_d_uro = (ei_x*ro_x+ei_y*ro_y+ei_z*ro_z)/ro
+    
+    ji_c_uro_v = cross(ji_v, uro_v)
+    ei_c_uro_v = cross(ei_v, uro_v)
+    ji_c_ei_v = cross(ji_v, ei_v)
+    
+    ro_grad_inv_ro = - uro_v/ro
+    grad_ji_d_uro = ji_d_uro*ro_grad_inv_ro + ji_v/ro
+    grad_ei_d_uro = ei_d_uro*ro_grad_inv_ro + ei_v/ro
+    
+    # derivatives of inner orbit's dir vects 
+    dji_v = inv_t_LK_1p5 * (5.*ei_d_uro*ei_c_uro_v - ji_d_uro*ji_c_uro_v)
+    dei_v = inv_t_LK_1p5 * (5.*ei_d_uro*ji_c_uro_v - ji_d_uro*ei_c_uro_v - 2.*ji_c_ei_v)
+    
+    dLi_v = Li_e0 * dji_v
+    
+    # Keplerian modtions of the outer binary
+    acco_v = phiK * ro_grad_inv_ro \
+            -phiQ* (3.*ro_grad_inv_ro*(-1. + 6.*ei**2.+3.*ji_d_uro**2. - 15.*ei_d_uro**2.)\
+                  + 6. * ji_d_uro*grad_ji_d_uro \
+                  - 30.* ei_d_uro*grad_ei_d_uro)
+    
+    dy_LK_vect = np.array([\
+                 dLi_v[0],  dLi_v[1],  dLi_v[2],\
+                 dei_v[0],  dei_v[1],  dei_v[2],\
+                 vo_x,      vo_y,      vo_z,    \
+                 acco_v[0], acco_v[1], acco_v[2]\
+        ])
+    
+    return dy_LK_vect
+    
 
 @jit(nopython=True, fastmath=True)
 def get_dy_SP(y_SP_vect, par, par_SP):
@@ -201,9 +507,12 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     uS1_v = np.array([uS1_x, uS1_y, uS1_z])
     uS2_v = np.array([uS2_x, uS2_y, uS2_z])
     
-    uLi_d_uS1 = inner(uLi_v, uS1_v)
-    uLi_d_uS2 = inner(uLi_v, uS2_v)
-    uS1_d_uS2 = inner(uS1_v, uS2_v)
+#     uLi_d_uS1 = inner(uLi_v, uS1_v)
+#     uLi_d_uS2 = inner(uLi_v, uS2_v)
+#     uS1_d_uS2 = inner(uS1_v, uS2_v)
+    uLi_d_uS1 = (uLi_x*uS1_x + uLi_y*uS1_y + uLi_z*uS1_z)
+    uLi_d_uS2 = (uLi_x*uS2_x + uLi_y*uS2_y + uLi_z*uS2_z)
+    uS1_d_uS2 = (uS1_x*uS2_x + uS1_y*uS2_y + uS1_z*uS2_z)
     
     uLi_c_uS1_v = cross(uLi_v, uS1_v)
     uLi_c_uS2_v = cross(uLi_v, uS2_v)
@@ -278,17 +587,18 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     
     Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
     Lo_e0 = mu_o*np.sqrt(G*(M1+M2+M3)*ao)
+    Li = np.sqrt(Li_v[0]**2.+Li_v[1]**2.+Li_v[2]**2.)
     
-    ei = np.sqrt(inner(ei_v, ei_v))
-    eo = np.sqrt(inner(eo_v, eo_v))
-    eff_i = np.sqrt(1.-ei**2.)
+    ei = np.sqrt(ei_v[0]**2.+ei_v[1]**2.+ei_v[2]**2.)
+    eo = np.sqrt(eo_v[0]**2.+eo_v[1]**2.+eo_v[2]**2.)
+    eff_i = Li/Li_e0
     eff_o = np.sqrt(1.-eo**2.)
     
-    S1 = np.sqrt(inner(S1_v, S1_v))
-    S2 = np.sqrt(inner(S2_v, S2_v))
+    S1 = np.sqrt(S1_v[0]**2.+S1_v[1]**2.+S1_v[2]**2.)
+    S2 = np.sqrt(S2_v[0]**2.+S2_v[1]**2.+S2_v[2]**2.)
     
     # unity vectors
-    uLi_v = Li_v / (Li_e0 * eff_i)
+    uLi_v = Li_v / Li
     uLo_v = Lo_v / (Lo_e0 * eff_o)
     uS1_v = S1_v / S1
     uS2_v = S2_v / S2
@@ -376,6 +686,137 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     return dy_nat_vect
 
 @jit(nopython=True, fastmath=True)
+def evol_LK_quad_sa(t_nat, y_nat_vect, par):
+    # parse parameters
+    # 0
+    # 1-6
+    # 7-12
+    # 13-15
+    # 16-18
+    ai_nat, \
+    Li_nat_x, Li_nat_y, Li_nat_z, ei_x, ei_y, ei_z, \
+    ro_nat_x, ro_nat_y, ro_nat_z, vo_nat_x, vo_nat_y, vo_nat_z, \
+    S1_nat_x, S1_nat_y, S1_nat_z, \
+    S2_nat_x, S2_nat_y, S2_nat_z\
+                = y_nat_vect
+    
+    # global par
+    M1, M2, M3, ao,\
+    t_unit, Li_unit, __, ai_unit, S1_unit, S2_unit, \
+    br_flag, ss_flag\
+                = par
+    
+    # convert to cgs units
+    ai = ai_nat * ai_unit
+    Li_v = np.array([Li_nat_x, Li_nat_y, Li_nat_z]) * Li_unit
+    S1_v = np.array([S1_nat_x, S1_nat_y, S1_nat_z]) * S1_unit
+    S2_v = np.array([S2_nat_x, S2_nat_y, S2_nat_z]) * S2_unit
+    
+    ei_v = np.array([ei_x, ei_y, ei_z])
+    
+    ro_v = np.array([ro_nat_x, ro_nat_y, ro_nat_z]) * ao
+    vo_v = np.array([vo_nat_x, vo_nat_y, vo_nat_z]) * ao/t_unit
+    
+    # scalar quantities that will be useful for the other parts
+    mu_i = M1*M2/(M1+M2)
+    mu_o = (M1+M2)*M3/(M1+M2+M3)
+    omega_i = np.sqrt(G*(M1+M2)/ai**3.)
+    
+    Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
+    Li = np.sqrt(Li_v[0]**2.+Li_v[1]**2.+Li_v[2]**2.)
+    ei = np.sqrt(ei_v[0]**2.+ei_v[1]**2.+ei_v[2]**2.)
+    eff_i = Li/Li_e0
+    
+    S1 = np.sqrt(S1_v[0]**2.+S1_v[1]**2.+S1_v[2]**2.)
+    S2 = np.sqrt(S2_v[0]**2.+S2_v[1]**2.+S2_v[2]**2.)
+    
+    # unity vectors
+    uLi_v = Li_v / Li
+    uS1_v = S1_v / S1
+    uS2_v = S2_v / S2
+    
+    # get GR & GW terms
+    y_orb_vect = np.array([ai, \
+                           Li_v[0], Li_v[1], Li_v[2], \
+                           ei_v[0], ei_v[1], ei_v[2]])
+    par_GR = np.array([mu_i, omega_i,\
+                       Li_e0, ei, eff_i,\
+                       uLi_v[0], uLi_v[1], uLi_v[2]])
+
+    dai,\
+    dLi_GR_x, dLi_GR_y, dLi_GR_z, \
+    dei_GR_x, dei_GR_y, dei_GR_z\
+        = get_dy_orb_GR_GW(y_orb_vect, par, par_GR)
+        
+    # get LK terms
+    y_LK_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                          ei_v[0], ei_v[1], ei_v[2], \
+                          ro_v[0], ro_v[1], ro_v[2], \
+                          vo_v[0], vo_v[1], vo_v[2]])
+    par_LK = np.array([mu_i, mu_o, omega_i, ai, \
+                        Li_e0, ei, eff_i, \
+                        uLi_v[0], uLi_v[1], uLi_v[2]])
+    
+    dLi_LK_x, dLi_LK_y, dLi_LK_z, \
+    dei_LK_x, dei_LK_y, dei_LK_z, \
+    dro_LK_x, dro_LK_y, dro_LK_z, \
+    dvo_LK_x, dvo_LK_y, dvo_LK_z\
+        = get_dy_LK_quad_sa(y_LK_vect, par, par_LK)
+        
+    # get SL & SS terms
+    y_SP_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                          ei_v[0], ei_v[1], ei_v[2], \
+                          S1_v[0], S1_v[1], S1_v[2], \
+                          S2_v[0], S2_v[1], S2_v[2]])
+    par_SP = np.array([mu_i, omega_i, ai, \
+                        Li_e0, ei, eff_i, S1, S2, \
+                        uLi_v[0], uLi_v[1], uLi_v[2], \
+                        uS1_v[0], uS1_v[1], uS1_v[2], \
+                        uS2_v[0], uS2_v[1], uS2_v[2]])
+    
+    dLi_SP_x, dLi_SP_y, dLi_SP_z, \
+    dei_SP_x, dei_SP_y, dei_SP_z, \
+    dS1_SP_x, dS1_SP_y, dS1_SP_z, \
+    dS2_SP_x, dS2_SP_y, dS2_SP_z\
+        = get_dy_SP(y_SP_vect, par, par_SP)
+            
+    # total 
+    # GW of semi-major axis
+    dai_nat = dai / ai_unit
+    
+    # inner orb sees GR&GW + LK + SP back reaction
+    dLi_nat_x = (dLi_GR_x + dLi_LK_x + dLi_SP_x) / Li_unit
+    dLi_nat_y = (dLi_GR_y + dLi_LK_y + dLi_SP_y) / Li_unit
+    dLi_nat_z = (dLi_GR_z + dLi_LK_z + dLi_SP_z) / Li_unit
+    dei_x = dei_GR_x + dei_LK_x + dei_SP_x
+    dei_y = dei_GR_y + dei_LK_y + dei_SP_y
+    dei_z = dei_GR_z + dei_LK_z + dei_SP_z
+    
+    # outer orb sees only LK
+    dro_nat_x = dro_LK_x / ao
+    dro_nat_y = dro_LK_y / ao
+    dro_nat_z = dro_LK_z / ao
+    dvo_nat_x = dvo_LK_x / ao * t_unit
+    dvo_nat_y = dvo_LK_y / ao * t_unit
+    dvo_nat_z = dvo_LK_z / ao * t_unit
+    
+    # S1/S2 sees SP (de Sitter & Lense-Thirring)
+    dS1_nat_x = dS1_SP_x / S1_unit
+    dS1_nat_y = dS1_SP_y / S1_unit
+    dS1_nat_z = dS1_SP_z / S1_unit
+    dS2_nat_x = dS2_SP_x / S2_unit
+    dS2_nat_y = dS2_SP_y / S2_unit
+    dS2_nat_z = dS2_SP_z / S2_unit
+    
+    dy_nat_vect = np.array([\
+            dai_nat, \
+            dLi_nat_x, dLi_nat_y, dLi_nat_z, dei_x, dei_y, dei_z, \
+            dro_nat_x, dro_nat_y, dro_nat_z, dvo_nat_x, dvo_nat_y, dvo_nat_z, \
+            dS1_nat_x, dS1_nat_y, dS1_nat_z, \
+            dS2_nat_x, dS2_nat_y, dS2_nat_z]) * t_unit
+    return dy_nat_vect
+
+@jit(nopython=True, fastmath=True)
 def evol_binary(t_nat, y_nat_vect, par):
     # parse parameters
     # 0
@@ -407,16 +848,15 @@ def evol_binary(t_nat, y_nat_vect, par):
     omega_i = np.sqrt(G*(M1+M2)/ai**3.)
     
     Li_e0 = mu_i*np.sqrt(G*(M1+M2)*ai)
-    Li = np.sqrt(inner(Li_v, Li_v))
-
-    ei = np.sqrt(inner(ei_v, ei_v))
+    Li = np.sqrt(Li_v[0]**2.+Li_v[1]**2.+Li_v[2]**2.)
+    ei = np.sqrt(ei_v[0]**2.+ei_v[1]**2.+ei_v[2]**2.)
     eff_i = Li/Li_e0
     
-    S1 = np.sqrt(inner(S1_v, S1_v))
-    S2 = np.sqrt(inner(S2_v, S2_v))
+    S1 = np.sqrt(S1_v[0]**2.+S1_v[1]**2.+S1_v[2]**2.)
+    S2 = np.sqrt(S2_v[0]**2.+S2_v[1]**2.+S2_v[2]**2.)
     
     # unity vectors
-    uLi_v = Li_v / (Li)
+    uLi_v = Li_v / Li
     uS1_v = S1_v / S1
     uS2_v = S2_v / S2
     
