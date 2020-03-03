@@ -256,7 +256,7 @@ uS1_d_uLi = (S1_x*Li_x + S1_y*Li_y + S1_z*Li_z)/(S1 * Li)
 uS2_d_uLi = (S2_x*Li_x + S2_y*Li_y + S2_z*Li_z)/(S2 * Li)
 uS1_d_uS2 = (S1_x*S2_x + S1_y*S2_y + S1_z*S2_z)/(S1*S2)
 
-chi_eff = np.median((M1*uS1_d_uLi*chi1 + M2*uS2_d_uLi*chi2)/(M1+M2))
+chi_eff = (M1*uS1_d_uLi[-1]*chi1 + M2*uS2_d_uLi[-1]*chi2)/(M1+M2)
 
 theta1_SL = np.arccos(uS1_d_uLi)
 theta2_SL = np.arccos(uS2_d_uLi)
@@ -306,7 +306,7 @@ fid.close()
 
 ## record condition at the end of LK
 fid = open(data_dir + prefix + 'LK_cond.txt', 'a')
-fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6f\t%.6f\t%.6f\n'\
+fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.6e\t%.9e\t%.9e\t%.6e\t%.9e\t%.9e\t%.9e\t%.6f\t%.6f\t%.6f\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, 
             ai[-1]/r_Mt, 1-ei[-1], 1-np.max(ei), tt[-1]/P_yr,
             J[-1]/S_Mt, Li[-1]/S_Mt, S[-1]/S_Mt, 

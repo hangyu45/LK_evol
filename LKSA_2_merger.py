@@ -54,9 +54,9 @@ import LKlib as LK
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run-id', type=np.int, default=0)
-parser.add_argument('--M3', type=np.float, default=30., 
+parser.add_argument('--M3', type=np.float, default=1.e7, 
                    help='M3 in [Msun]')
-parser.add_argument('--ao', type=np.float, default=(4500.*AU/pc), 
+parser.add_argument('--ao', type=np.float, default=1, 
                    help='Semi-major axis of the outer orbit in [pc]')
 parser.add_argument('--ai-0', type=np.float, default=100., 
                    help='Initial semi-major axis of the inner orbit in [AU]')
@@ -94,26 +94,26 @@ ai_0*=AU
 
 ## FIXME ##
 # fix M1, M2, chi1, chi2
-M1, M2 = 30.*Ms, 20.*Ms
+M1, M2 = 85.*Ms, 65.*Ms
 chi1, chi2=0.7, 0.7
 Tgw_trgt = 10e9 * P_yr
 
 # only randomize angle
-# I_io_m, I_io_p = LK.find_merger_window(Tgw_trgt, \
-#                       M1, M2, M3, ai_0, ao, eo=0.)
-# I_io_0 = stats.uniform(loc=I_io_m, scale=(I_io_p-I_io_m)).rvs() 
-# I_S1_0 = stats.uniform(scale=np.pi).rvs() 
-# phi_S1_0 = stats.uniform(scale=2.*np.pi).rvs()
-# I_S2_0 = stats.uniform(scale=np.pi).rvs()
-# phi_S2_0 = stats.uniform(scale=2.*np.pi).rvs()
+I_io_m, I_io_p = LK.find_merger_window(Tgw_trgt, \
+                      M1, M2, M3, ai_0, ao, eo=0.)
+I_io_0 = stats.uniform(loc=I_io_m, scale=(I_io_p-I_io_m)).rvs() 
+I_S1_0 = stats.uniform(scale=np.pi).rvs() 
+phi_S1_0 = stats.uniform(scale=2.*np.pi).rvs()
+I_S2_0 = stats.uniform(scale=np.pi).rvs()
+phi_S2_0 = stats.uniform(scale=2.*np.pi).rvs()
+phi_ro_0 = stats.uniform(scale=2.*np.pi).rvs()
 
-I_io_0 = 92.52 * np.pi/180.
-I_S1_0 = 92.52 * np.pi/180.
-phi_S1_0 = 45.*np.pi/180.
-I_S2_0 = 92.52 * np.pi/180.
-phi_S2_0 = 0.*45.*np.pi/180.
-
-phi_ro_0 = 0.
+#I_io_0 = 1.569669
+#I_S1_0 = 2.429205
+#phi_S1_0 = 1.606535
+#I_S2_0 = 2.341514
+#phi_S2_0 = 6.045855
+#phi_ro_0 = 1.283801
 
 rot_in_plane_mtrx = \
     np.array([[np.cos(I_io_0),  0, np.sin(I_io_0)], 
@@ -259,7 +259,7 @@ uS1_d_uLi = (S1_x*Li_x + S1_y*Li_y + S1_z*Li_z)/(S1 * Li)
 uS2_d_uLi = (S2_x*Li_x + S2_y*Li_y + S2_z*Li_z)/(S2 * Li)
 uS1_d_uS2 = (S1_x*S2_x + S1_y*S2_y + S1_z*S2_z)/(S1*S2)
 
-chi_eff = np.median((M1*uS1_d_uLi*chi1 + M2*uS2_d_uLi*chi2)/(M1+M2))
+chi_eff = (M1*uS1_d_uLi[-1]*chi1 + M2*uS2_d_uLi[-1]*chi2)/(M1+M2)
 
 theta1_SL = np.arccos(uS1_d_uLi)
 theta2_SL = np.arccos(uS2_d_uLi)
@@ -278,6 +278,7 @@ if plot_flag>0:
     ax=fig.add_subplot(413)
     ax.plot(tt/1.e9/P_yr, theta1_SL*180./np.pi, alpha=0.8, label=r'$S_1$', color='tab:grey')
     ax.plot(tt/1.e9/P_yr, theta2_SL*180./np.pi, alpha=0.8, label=r'$S_2$', color='tab:olive')
+    ax.axhline(chi_eff*100., color='tab:grey', ls='--', alpha=0.5, label=r'$100 \chi_eff$')
     ax.axhline(90., color='tab:red', ls=':', alpha=0.5)
     ax.set_ylabel(r'$\theta_{SL}$ [$^\circ$]')
     ax.legend(loc='upper left')
@@ -310,7 +311,7 @@ fid.close()
 
 ## record condition at the end of LK
 fid = open(data_dir + prefix + 'LK_cond.txt', 'a')
-fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6e\t%.6f\t%.6f\t%.6f\n'\
+fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.6e\t%.9e\t%.9e\t%.6e\t%.9e\t%.9e\t%.9e\t%.6f\t%.6f\t%.6f\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, 
             ai[-1]/r_Mt, 1-ei[-1], 1-np.max(ei), tt[-1]/P_yr,
             J[-1]/S_Mt, Li[-1]/S_Mt, S[-1]/S_Mt, 
