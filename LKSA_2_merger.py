@@ -54,9 +54,9 @@ import LKlib as LK
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--run-id', type=np.int, default=0)
-parser.add_argument('--M3', type=np.float, default=1.e7, 
+parser.add_argument('--M3', type=np.float, default=30., 
                    help='M3 in [Msun]')
-parser.add_argument('--ao', type=np.float, default=1., 
+parser.add_argument('--ao', type=np.float, default=(4500.*AU/pc), 
                    help='Semi-major axis of the outer orbit in [pc]')
 parser.add_argument('--ai-0', type=np.float, default=100., 
                    help='Initial semi-major axis of the inner orbit in [AU]')
@@ -74,9 +74,9 @@ atol, rtol = kwargs['atol'], kwargs['rtol']
 br_flag, ss_flag=1, 1
 plot_flag = kwargs['plot_flag']
 
-fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/M3_%.1e_ao_%.1epc_ai0_%.1eAU/'\
+fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/SA/M3_%.1e_ao_%.1epc_ai0_%.1eAU/'\
             %(M3, ao, ai_0)
-data_dir = 'data/LK2merger/M3_%.1e_ao_%.1epc_ai0_%.1eAU/'\
+data_dir = 'data/LK2merger/SA/M3_%.1e_ao_%.1epc_ai0_%.1eAU/'\
             %(M3, ao, ai_0)
 prefix = 'id_%i_'%(run_id)
 if not os.path.exists(fig_dir):
@@ -94,24 +94,31 @@ ai_0*=AU
 
 ## FIXME ##
 # fix M1, M2, chi1, chi2
-M1, M2 = 85.*Ms, 65.*Ms
+M1, M2 = 30.*Ms, 20.*Ms
 chi1, chi2=0.7, 0.7
-Tgw_trgt = 3e8 * P_yr
+Tgw_trgt = 10e9 * P_yr
 
 # only randomize angle
-I_io_m, I_io_p = LK.find_merger_window(Tgw_trgt, \
-                      M1, M2, M3, ai_0, ao, eo=0.)
-I_io_0 = stats.uniform(loc=I_io_m, scale=(I_io_p-I_io_m)).rvs() 
-I_S1_0 = stats.uniform(scale=np.pi).rvs() 
-phi_S1_0 = stats.uniform(scale=2.*np.pi).rvs()
-I_S2_0 = stats.uniform(scale=np.pi).rvs()
-phi_S2_0 = stats.uniform(scale=2.*np.pi).rvs()
+# I_io_m, I_io_p = LK.find_merger_window(Tgw_trgt, \
+#                       M1, M2, M3, ai_0, ao, eo=0.)
+# I_io_0 = stats.uniform(loc=I_io_m, scale=(I_io_p-I_io_m)).rvs() 
+# I_S1_0 = stats.uniform(scale=np.pi).rvs() 
+# phi_S1_0 = stats.uniform(scale=2.*np.pi).rvs()
+# I_S2_0 = stats.uniform(scale=np.pi).rvs()
+# phi_S2_0 = stats.uniform(scale=2.*np.pi).rvs()
 
-# I_io_0 = 92.52 * np.pi/180.
-# I_S1_0 = 92.52 * np.pi/180.
-# phi_S1_0 = 45.*np.pi/180.
-# I_S2_0 = 92.52 * np.pi/180.
-# phi_S2_0 = 0.*45.*np.pi/180.
+I_io_0 = 92.52 * np.pi/180.
+I_S1_0 = 92.52 * np.pi/180.
+phi_S1_0 = 45.*np.pi/180.
+I_S2_0 = 92.52 * np.pi/180.
+phi_S2_0 = 0.*45.*np.pi/180.
+
+phi_ro_0 = 0.
+
+rot_in_plane_mtrx = \
+    np.array([[np.cos(I_io_0),  0, np.sin(I_io_0)], 
+              [0,               1,              0], 
+              [-np.sin(I_io_0), 0, np.cos(I_io_0)]])
 
 uLi_0 = np.array([np.sin(I_io_0), 0., np.cos(I_io_0)])
 uS1_0 = np.array([np.sin(I_S1_0)*np.cos(phi_S1_0), 
@@ -121,9 +128,12 @@ uS2_0 = np.array([np.sin(I_S2_0)*np.cos(phi_S2_0),
                   np.sin(I_S2_0)*np.sin(phi_S2_0),               
                   np.cos(I_S2_0)])
 
+uro_0 = np.array([np.cos(phi_ro_0), np.sin(phi_ro_0), 0])
+uvo_0 = np.array([-np.sin(phi_ro_0), np.cos(phi_ro_0), 0])
+
 theta1_SL_0 = np.arccos(LK.inner(uLi_0, uS1_0))
 theta2_SL_0 = np.arccos(LK.inner(uLi_0, uS2_0))
-print(theta1_SL_0*180./np.pi, theta2_SL_0*180./np.pi)
+print('initial sl alignment:', theta1_SL_0*180./np.pi, theta2_SL_0*180./np.pi)
 
 #######################################################################
 ### Initial vectors
@@ -145,21 +155,19 @@ S_Mt=G*(M1+M2)**2./c
 ei_0 = 1.e-3
 eff_i_0 = np.sqrt(1.-ei_0**2.)
 Li_0 = mu_i * np.sqrt(G*(M1+M2)*ai_0)*eff_i_0
-eo = 0.
-eff_o = np.sqrt(1.-eo**2.)
-Lo = mu_o * np.sqrt(G*(M1+M2+M3)*ao)*eff_o
 
 t_GW_0 = LK.get_inst_t_gw_from_a_orb(M1, M2, ai_0, ei_0)
 t_LK_0 = LK.get_t_lk(M1, M2, M3, ai_0, ao)
-print('T_gw/yr, T_lk/yr:', '%e, %e'%(t_GW_0/P_yr, t_LK_0/P_yr))
+to_0 = 2.*np.pi/np.sqrt(G*(M1+M2+M3)/ao**3.)
+print('T_gw/yr, T_lk/yr, To/yr:', '%e, %e, %e'%(t_GW_0/P_yr, t_LK_0/P_yr, to_0/P_yr))
 
 e_max = LK.find_ei_max_vs_Ii_0(I_io_0, \
         M1, M2, M3, ai_0, ao, eo=0)
 t_GW_exp = LK.get_inst_t_gw_from_a_orb(M1, M2, ai_0, 0)*(1.-e_max**2.)**3.
 print('(1-e_max), T_gw_exp/yr', '%e, %e'%(1-e_max, t_GW_exp/P_yr))
 
-t_unit=t_LK_0
-Li_unit, Lo_unit = Li_0, Lo
+t_unit=to_0
+Li_unit, Lo_unit = Li_0, np.inf
 ai_unit = ai_0
 S1_unit = S1
 S2_unit = S2
@@ -170,15 +178,15 @@ par_LK = np.array([M1, M2, M3, ao, \
 ai_nat = ai_0/ai_unit
 Li_nat_v = uLi_0 * Li_0/Li_unit
 ei_v = np.array([0., ei_0, 0])
-Lo_nat_v = np.array([0., 0., 1.])*Lo/Lo_unit
-eo_v = np.zeros(3)
+ro_nat_v = uro_0 # * ao/ao; since ao is conserved, it is used as the ao unit by default
+vo_nat_v = uvo_0 * 2.*np.pi/to_0 * t_unit
 S1_nat_v = uS1_0 * S1/S1_unit
 S2_nat_v = uS2_0 * S2/S2_unit
 
 y_nat_init = np.hstack([
     ai_nat, \
     Li_nat_v, ei_v, \
-    Lo_nat_v, eo_v, \
+    ro_nat_v, vo_nat_v, \
     S1_nat_v, S2_nat_v])
 
 #######################################################################
@@ -188,15 +196,10 @@ t_run0 = timeit.default_timer()
 @jit(nopython=True)
 def terminator(t_nat, y_nat_vect, par):
     # parse parameters
-    ai_nat,\
-    Li_nat_x, Li_nat_y, Li_nat_z, ei_x, ei_y, ei_z, \
-    Lo_nat_x, Lo_nat_y, Lo_nat_z, eo_x, eo_y, eo_z, \
-    S1_nat_x, S1_nat_y, S1_nat_z, \
-    S2_nat_x, S2_nat_y, S2_nat_z\
-                = y_nat_vect
-    M1, M2, M3, ao, \
-    t_unit, Li_unit, Lo_unit, ai_unit, S1_unit, S2_unit, \
-    br_flag, ss_flag\
+    ai_nat = y_nat_vect[0]
+    M1, M2, M3, __, \
+    t_unit, __, __, ai_unit, __, __, \
+    __, __\
                 = par
         
     ai = ai_nat * ai_unit
@@ -208,14 +211,14 @@ term_func.direction = -1
 term_func.terminal = True
 
 int_func=lambda t_nat_, y_nat_vect_:\
-    LK.evol_LK_quad_da(t_nat_, y_nat_vect_, par_LK)
+    LK.evol_LK_quad_sa(t_nat_, y_nat_vect_, par_LK)
     
 sol=integ.solve_ivp(int_func, \
-        t_span=(0, 1e8), y0=y_nat_init, rtol=rtol, atol=atol, \
+        t_span=(0, 1e9), y0=y_nat_init, rtol=rtol, atol=atol, \
         events=term_func)
 
 t_run1 = timeit.default_timer()
-print('LK run time:', t_run1 - t_run0)
+print('LK SA run time:', t_run1 - t_run0)
 
 #######################################################################
 ### LK outputs
@@ -296,12 +299,13 @@ if ai[-1]/ai_0>0.11:
 # proceed & record data only if LK converged
 ## record initial condition
 fid = open(data_dir + prefix + 'init_cond.txt', 'a')
-fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n'\
+fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, 
             I_io_0, \
             I_S1_0, phi_S1_0, \
             I_S2_0, phi_S2_0, \
-            theta1_SL_0, theta2_SL_0))
+            theta1_SL_0, theta2_SL_0, 
+            phi_ro_0))
 fid.close()
 
 ## record condition at the end of LK

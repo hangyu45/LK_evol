@@ -73,12 +73,17 @@ def find_Tgw_min_vs_Ii_0(Ii_0, \
         M1, M2, M3, ai, ao, eo=0):
     ei_max = find_ei_max_vs_Ii_0(Ii_0, \
         M1, M2, M3, ai, ao, eo)
-    t_gw_min = get_inst_t_gw_from_a_orb(M1, M2, ai, ei_max)
+    
+    # note t_gw_min is not simply given by instant. merger time at e_max
+    # but needs 1/\sqrt(1-e**2) more time
+    t_gw_min = get_inst_t_gw_from_a_orb(M1, M2, ai, 0)
+    t_gw_min *= (1.-ei_max**2.)**3.
     return t_gw_min
 
 def find_Tgw_lim_over_Ii_0(M1, M2, M3, ai, ao, eo=0):
     ei_lim = find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo)
-    t_gw_lim = get_inst_t_gw_from_a_orb(M1, M2, ai, ei_lim)
+    t_gw_lim = get_inst_t_gw_from_a_orb(M1, M2, ai, 0)
+    t_gw_lim *= (1.-ei_lim**2.)**3.
     return t_gw_lim
 
 def find_merger_window(Tgw_trgt, \
@@ -103,8 +108,8 @@ def find_merger_window(Tgw_trgt, \
                 -np.sqrt(ep_BR**2.+60.-80.*ep_GR/3.))
     I_pp = np.arccos(I_pp)
 #     print(I_mm*180./np.pi, I_pp*180./np.pi)
-    I_m = opt.ridder(resi, I_mm*(1.+1.e-6), I_lim)
-    I_p = opt.ridder(resi, I_lim, I_pp*(1.-1.e-6))
+    I_m = opt.ridder(resi, I_mm*(1.+1.e-12), I_lim)
+    I_p = opt.ridder(resi, I_lim, I_pp*(1.-1.e-12))
     return I_m, I_p
 
 def check_LK_exc(M1, M2, M3, ai, ao, eo=0):
@@ -520,7 +525,7 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     uS1_c_ei_v  = cross(uS1_v, ei_v )
     uS2_c_ei_v  = cross(uS2_v, ei_v )
     uLi_c_ei_v  = cross(uLi_v, ei_v ) 
-    
+
     # de Sitter
     dLi_SL_v = omega1_SL_br_Li * (-uLi_c_uS1_v)\
              + omega2_SL_br_Li * (-uLi_c_uS2_v)
