@@ -69,6 +69,15 @@ def find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo=0):
     ei_lim = opt.ridder(resi, 0., 1.-1.e-18)
     return ei_lim
 
+def find_Ii_lim_for_ei_lim(M1, M2, M3, ai, ao, eo=0):
+    ei_lim = find_ei_lim_over_Ii_0(M1, M2, M3, ai, ao, eo)
+    ep_BR = get_epsilon_BR(M1, M2, M3, ai, ao, eo)
+    
+    j_lim_sq = 1.-ei_lim**2.
+    cIi_lim = 0.5*ep_BR*(0.8*j_lim_sq - 1.)
+    Ii_lim = np.arccos(cIi_lim)
+    return Ii_lim
+
 def find_Tgw_min_vs_Ii_0(Ii_0, \
         M1, M2, M3, ai, ao, eo=0):
     ei_max = find_ei_max_vs_Ii_0(Ii_0, \
@@ -326,7 +335,7 @@ def orb_evol(t_nat, Kep_vect, \
     dKep=np.array([drdt_nat, ddr_nat, dphidt_nat, ddphi_nat])
     return dKep
 
-@jit(nopython=True, fastmath=True)
+@jit(nopython=True)
 def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     """
     Lidov-Kozai
@@ -389,7 +398,7 @@ def get_dy_LK_quad_da(y_LK_vect, par, par_LK):
     
     return dy_LK_vect
 
-@jit(nopython=True, fastmath=True)
+@jit(nopython=True)
 def get_dy_LK_quad_sa(y_LK_vect, par, par_LK):
     """
     Lidov-Kozai under single averaging
@@ -1051,8 +1060,8 @@ def find_Smp(J, L, e, par, nPt=8000):
             /(4.*qq*S_unit*S_vect**2.*L)
     
     # note here is S vs chi-chi_eff!
-    chi_vs_S_func1 = interp.interp1d(S_vect, chi_vect1-chi_eff)
-    chi_vs_S_func2 = interp.interp1d(S_vect, chi_vect2-chi_eff)
+    chi_vs_S_func1 = interp.interp1d(S_vect.squeeze(), chi_vect1.squeeze()-chi_eff)
+    chi_vs_S_func2 = interp.interp1d(S_vect.squeeze(), chi_vect2.squeeze()-chi_eff)
     
     idx1 = np.argmin(chi_vect1)
     idx2 = np.argmax(chi_vect2)
