@@ -57,8 +57,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run-id', type=np.int, default=0)
 parser.add_argument('--t-m-cut', type=np.float, default=-1)
 parser.add_argument('--chi-eff-cut', type=np.float, default=0.1)
-parser.add_argument('--atol', type=np.float, default=1e-10)
-parser.add_argument('--rtol', type=np.float, default=1e-10)
+parser.add_argument('--atol', type=np.float, default=3e-12)
+parser.add_argument('--rtol', type=np.float, default=3e-12)
 parser.add_argument('--nPt', type=np.int, default = 100)
 parser.add_argument('--plot-flag', type=np.int, default=0)
 
@@ -75,12 +75,12 @@ br_flag, ss_flag=1, 1
 plot_flag = kwargs['plot_flag']
 
 if chi_eff_cut<0.15:
-    fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/rand_init_spin_ang/bin2merg/chi_eff_0/'
-    data_dir = 'data/rand_init_spin_ang/bin2merg/chi_eff_0/'
+    fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/rand_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_0/'
+    data_dir = 'data/rand_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_0/'
 else:
-    fig_dir = \
-      '/home/hang.yu/public_html/astro/LK_evol/LK2merger/rand_init_spin_ang/bin2merg/chi_eff_%.2f/'%chi_eff_cut
-    data_dir = 'data/rand_init_spin_ang/bin2merg/chi_eff_%.2f/'%chi_eff_cut
+    fig_dir =\
+    '/home/hang.yu/public_html/astro/LK_evol/LK2merger/rand_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_%.2f/'%chi_eff_cut
+    data_dir = 'data/rand_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_%.2f/'%chi_eff_cut
     
 prefix = 'id_%i_'%(run_id)
 if not os.path.exists(fig_dir):
@@ -88,17 +88,19 @@ if not os.path.exists(fig_dir):
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
     
-### read in the data from a_i = 600 M_t as the initial condition ### 
-data_600_dir = 'data/rand_init_spin_ang/DA/'
-data_600 = np.zeros([0, 10])
+### read in the data from a_i = 100 M_t as the initial condition ### 
+data_100_dir = 'data/rand_init_spin_ang/DA/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/'
+data_100 = np.zeros([0, 10])
 data_LK = np.zeros([0, 15])
 nFile=10
-for i in range(10):
-    if os.path.exists(data_600_dir + 'id_%i_r_600_cond.txt'%i):
-        data_600_ = np.loadtxt(data_600_dir + 'id_%i_r_600_cond.txt'%i)
-        data_600 = np.vstack([data_600, data_600_])
+
+# note that the 100 r_Mt files starts from an id of 100!!!
+for i in range(100, 100+nFile, 1):
+    if os.path.exists(data_100_dir + 'id_%i_r_100_cond.txt'%i):
+        data_100_ = np.loadtxt(data_100_dir + 'id_%i_r_100_cond.txt'%i)
+        data_100 = np.vstack([data_100, data_100_])
         
-        data_LK_ = np.loadtxt(data_600_dir + 'id_%i_LK_cond.txt'%i)
+        data_LK_ = np.loadtxt(data_100_dir + 'id_%i_LK_cond.txt'%i)
         data_LK = np.vstack([data_LK, data_LK_])
         
 ### apply cuts ###
@@ -110,16 +112,16 @@ if chi_eff_cut<0.15:
 else:
     idx = (chi_eff > (chi_eff_cut-0.05)) & (chi_eff < (chi_eff_cut+0.05)) & (t_m>t_m_cut)
 
-data_600 = data_600[idx, :]
+data_100 = data_100[idx, :]
 del data_LK, chi_eff, t_m
 
 ### draw one set of {J, L} ###
-nSamp = data_600.shape[0]
+nSamp = data_100.shape[0]
 samp_id = stats.randint.rvs(0, nSamp-1)
 print('Number of samples aft cut, sample id:', nSamp, samp_id)
-data_600 = data_600[samp_id, :]
+data_100 = data_100[samp_id, :]
 
-M1, M2, chi1, chi2, chi_eff = data_600[:5]
+M1, M2, chi1, chi2, chi_eff = data_100[:5]
 
 M1, M2 = M1*Ms, M2*Ms
 Mt = M1+M2
@@ -132,8 +134,8 @@ S_Mt = G*Mt**2./c
 
 S1, S2 = chi1*G*M1**2./c, chi2*G*M2**2./c
 
-a_0 = 600.*r_Mt
-J_0, L_0, e_0 = data_600[5:8]
+a_0 = 100.*r_Mt
+J_0, L_0, e_0 = data_100[5:8]
 J_0, L_0 = J_0*S_Mt, L_0*S_Mt
 
 ## draw S 
@@ -324,7 +326,10 @@ if plot_flag:
                     /(M1+M2)
     
         tau_gw_inst[i] = LK.get_inst_t_gw_from_a_orb(M1, M2, a_orb[i], 0)
-        tau_pre[i] = LK.get_tau_pre(J[i], L_orb[i], 0, par_JL, nPt=100)
+        try:
+            tau_pre[i] = LK.get_tau_pre(J[i], L_orb[i], 0, par_JL, nPt=nPt)
+        except ValueError:
+            tau_pre[i] = np.inf
         tau_pre_inst[i] = S[i]/np.abs(LK.get_dSdt(J[i], L_orb[i], 0, S[i], par_JL))
         
     fig=plt.figure(figsize=(9, 14))

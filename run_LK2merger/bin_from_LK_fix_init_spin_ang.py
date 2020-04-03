@@ -57,8 +57,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--run-id', type=np.int, default=0)
 parser.add_argument('--t-m-cut', type=np.float, default=-1)
 parser.add_argument('--chi-eff-cut', type=np.float, default=0.1)
-parser.add_argument('--atol', type=np.float, default=1e-10)
-parser.add_argument('--rtol', type=np.float, default=1e-10)
+parser.add_argument('--atol', type=np.float, default=3e-12)
+parser.add_argument('--rtol', type=np.float, default=3e-12)
 parser.add_argument('--nPt', type=np.int, default = 100)
 parser.add_argument('--plot-flag', type=np.int, default=0)
 
@@ -74,8 +74,14 @@ nPt = kwargs['nPt']
 br_flag, ss_flag=1, 1
 plot_flag = kwargs['plot_flag']
 
-fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/fix_init_spin_ang/bin2merg/'
-data_dir = 'data/fix_init_spin_ang/bin2merg/'
+if chi_eff_cut<0.15:
+    fig_dir = '/home/hang.yu/public_html/astro/LK_evol/LK2merger/fix_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_0/'
+    data_dir = 'data/fix_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_0/'
+else:
+    fig_dir =\
+    '/home/hang.yu/public_html/astro/LK_evol/LK2merger/fix_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_%.2f/'%chi_eff_cut
+    data_dir = 'data/fix_init_spin_ang/bin2merg/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/chi_eff_%.2f/'%chi_eff_cut
+    
 prefix = 'id_%i_'%(run_id)
 if not os.path.exists(fig_dir):
     os.makedirs(fig_dir)
@@ -83,11 +89,13 @@ if not os.path.exists(data_dir):
     os.makedirs(data_dir)
     
 ### read in the data from a_i = 600 M_t as the initial condition ### 
-data_600_dir = 'data/fix_init_spin_ang/DA/'
+data_600_dir = 'data/fix_init_spin_ang/DA/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/'
 data_600 = np.zeros([0, 10])
 data_LK = np.zeros([0, 15])
 nFile=10
-for i in range(10):
+
+# note that the 100 r_Mt files starts from an id of 100!!!
+for i in range(100, 100+nFile, 1):
     if os.path.exists(data_600_dir + 'id_%i_r_600_cond.txt'%i):
         data_600_ = np.loadtxt(data_600_dir + 'id_%i_r_600_cond.txt'%i)
         data_600 = np.vstack([data_600, data_600_])
