@@ -60,8 +60,8 @@ parser.add_argument('--ao', type=np.float, default=0.06,
                    help='Semi-major axis of the outer orbit in [pc]')
 parser.add_argument('--ai-0', type=np.float, default=3., 
                    help='Initial semi-major axis of the inner orbit in [AU]')
-parser.add_argument('--atol', type=np.float, default=1e-8)
-parser.add_argument('--rtol', type=np.float, default=1e-8)
+parser.add_argument('--atol', type=np.float, default=2e-9)
+parser.add_argument('--rtol', type=np.float, default=2e-9)
 parser.add_argument('--plot-flag', type=np.int, default=0)
 
 kwargs = parser.parse_args()
@@ -104,8 +104,17 @@ I_io_m, I_io_p = LK.find_merger_window(Tgw_trgt, \
 I_io_0 = stats.uniform(loc=I_io_m, scale=(I_io_p-I_io_m)).rvs() 
 
 # randomize the initial spin alignment wrt the total ang momentum
-I_S1_0 = stats.uniform(scale=np.pi).rvs()
-I_S2_0 = stats.uniform(scale=np.pi).rvs()
+# this is WRONG!!! doesn't give isotropic spin dir
+# I_S1_0 = stats.uniform(scale=np.pi).rvs()
+# I_S2_0 = stats.uniform(scale=np.pi).rvs()
+
+# this is the proper way of sampling isotropically
+# cf. https://mathworld.wolfram.com/SpherePointPicking.html
+pp1 = stats.uniform().rvs()
+pp2 = stats.uniform().rvs()
+I_S1_0 = np.arccos(2.*pp1 - 1.)
+I_S2_0 = np.arccos(2.*pp2 - 1.)
+
 phi_S1_0 = stats.uniform(scale=2.*np.pi).rvs()
 phi_S2_0 = stats.uniform(scale=2.*np.pi).rvs()
 
@@ -352,23 +361,23 @@ int_func=lambda L_nat_, J_nat_:\
     LK.evol_J_avg(L_nat_, J_nat_, e_vs_L_func, par_JL, nPt=nPt)
 
 #######################################################################
-### evol to 600 r_Mt
+### evol to 300 r_Mt
 #######################################################################
 
 t_run0 = timeit.default_timer()
 
-L_600 = L_vs_a_func(600.*r_Mt)
-e_600 = e_vs_L_func(L_600)
+L_300 = L_vs_a_func(300.*r_Mt)
+e_300 = e_vs_L_func(L_300)
 sol=integ.solve_ivp(int_func, \
-    t_span=(L_LK/S_Mt, L_600/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=1e-12)
+    t_span=(L_LK/S_Mt, L_300/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=1e-12)
 
-J_600 = sol.y[0,-1] * S_Mt
-print('r = 600 M')
-print('J, L, e', J_600/S_Mt, L_600/S_Mt, e_600)
+J_300 = sol.y[0,-1] * S_Mt
+print('r = 300 M')
+print('J, L, e', J_300/S_Mt, L_300/S_Mt, e_300)
 
-Sm_600, Sp_600=LK.find_Smp(J_600, L_600, e_600, par_JL)
+Sm_300, Sp_300=LK.find_Smp(J_300, L_300, e_300, par_JL)
 t_run1 = timeit.default_timer()
-print('dJdL run (to 600 M):', t_run1 - t_run0)
+print('dJdL run (to 300 M):', t_run1 - t_run0)
 
 #######################################################################
 ### record data
@@ -394,11 +403,11 @@ fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.6e\t%.9e\t%.9e\t%.6e\t%.9e\t%.9e\t%.9
             theta1_SL[-1], theta2_SL[-1], theta_SS[-1]))
 fid.close()
 
-fid = open(data_dir + prefix + 'r_600_cond.txt', 'a')
+fid = open(data_dir + prefix + 'r_300_cond.txt', 'a')
 fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.9e\t%.9e\t%.9e\t%.6e\t%.6e\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, \
-            J_600/S_Mt, L_600/S_Mt, e_600, \
-            Sm_600/S_Mt, Sp_600/S_Mt))
+            J_300/S_Mt, L_300/S_Mt, e_300, \
+            Sm_300/S_Mt, Sp_300/S_Mt))
 fid.close()
 
 #######################################################################

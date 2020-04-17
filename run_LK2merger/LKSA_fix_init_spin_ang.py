@@ -355,24 +355,24 @@ int_func=lambda L_nat_, J_nat_:\
     LK.evol_J_avg(L_nat_, J_nat_, e_vs_L_func, par_JL, nPt=nPt)
 
 #######################################################################
-### evol to 600 r_Mt
+### evol to 100 r_Mt
 #######################################################################
 
 t_run0 = timeit.default_timer()
 
-L_600 = L_vs_a_func(600.*r_Mt)
-e_600 = e_vs_L_func(L_600)
+L_100 = L_vs_a_func(100.*r_Mt)
+e_100 = e_vs_L_func(L_100)
 sol=integ.solve_ivp(int_func, \
-    t_span=(L_LK/S_Mt, L_600/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=1e-12)
+    t_span=(L_LK/S_Mt, L_100/S_Mt), y0=np.array([J_LK/S_Mt]), rtol=3e-12, atol=1e-12)
 
-J_600 = sol.y[0,-1] * S_Mt
-print('r = 600 M')
-print('J, L, e', J_600/S_Mt, L_600/S_Mt, e_600)
+J_100 = sol.y[0,-1] * S_Mt
+print('r = 100 M')
+print('J, L, e', J_100/S_Mt, L_100/S_Mt, e_100)
 
-Sm_600, Sp_600=LK.find_Smp(J_600, L_600, e_600, par_JL)
+Sm_100, Sp_100=LK.find_Smp(J_100, L_100, e_100, par_JL)
 
 t_run1 = timeit.default_timer()
-print('dJdL run (to 600 M):', t_run1 - t_run0)
+print('dJdL run (to 100 M):', t_run1 - t_run0)
 
 #######################################################################
 ### record data
@@ -398,11 +398,11 @@ fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.6e\t%.9e\t%.9e\t%.6e\t%.9e\t%.9e\t%.9
             theta1_SL[-1], theta2_SL[-1], theta_SS[-1]))
 fid.close()
 
-fid = open(data_dir + prefix + 'r_600_cond.txt', 'a')
+fid = open(data_dir + prefix + 'r_100_cond.txt', 'a')
 fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.9f\t%.9e\t%.9e\t%.9e\t%.6e\t%.6e\n'\
           %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, \
-            J_600/S_Mt, L_600/S_Mt, e_600, \
-            Sm_600/S_Mt, Sp_600/S_Mt))
+            J_100/S_Mt, L_100/S_Mt, e_100, \
+            Sm_100/S_Mt, Sp_100/S_Mt))
 fid.close()
 
 #######################################################################

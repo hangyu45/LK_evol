@@ -88,35 +88,39 @@ if not os.path.exists(fig_dir):
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
     
-### read in the data from a_i = 600 M_t as the initial condition ### 
-data_600_dir = 'data/fix_init_spin_ang/DA/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/'
-data_600 = np.zeros([0, 10])
+### read in the data from a_i = 300 M_t as the initial condition ### 
+data_300_dir = 'data/fix_init_spin_ang/DA/M3_1.0e+09Ms_ao_0.060pc_ai0_3.0AU/'
+data_300 = np.zeros([0, 10])
 data_LK = np.zeros([0, 15])
 nFile=10
 
-# note that the 100 r_Mt files starts from an id of 100!!!
+# note that the 300 r_Mt files starts from an id of 100!!!
 for i in range(100, 100+nFile, 1):
-    if os.path.exists(data_600_dir + 'id_%i_r_600_cond.txt'%i):
-        data_600_ = np.loadtxt(data_600_dir + 'id_%i_r_600_cond.txt'%i)
-        data_600 = np.vstack([data_600, data_600_])
+    if os.path.exists(data_300_dir + 'id_%i_r_300_cond.txt'%i):
+        data_300_ = np.loadtxt(data_300_dir + 'id_%i_r_300_cond.txt'%i)
+        data_300 = np.vstack([data_300, data_300_])
         
-        data_LK_ = np.loadtxt(data_600_dir + 'id_%i_LK_cond.txt'%i)
+        data_LK_ = np.loadtxt(data_300_dir + 'id_%i_LK_cond.txt'%i)
         data_LK = np.vstack([data_LK, data_LK_])
         
 ### apply cuts ###
 chi_eff, t_m = data_LK[:, 4], data_LK[:, 8]
+u_m_e = data_LK[:, 7]
 idx = (np.abs(chi_eff)<chi_eff_cut) & (t_m>t_m_cut)
 
-data_600 = data_600[idx, :]
-del data_LK, chi_eff, t_m
+data_300 = data_300[idx, :]
+t_m, u_m_e = t_m[idx], u_m_e[idx]
+del data_LK
 
 ### draw one set of {J, L} ###
-nSamp = data_600.shape[0]
+nSamp = data_300.shape[0]
 samp_id = stats.randint.rvs(0, nSamp-1)
 print('Number of samples aft cut, sample id:', nSamp, samp_id)
-data_600 = data_600[samp_id, :]
+data_300 = data_300[samp_id, :]
+t_m, u_m_e = t_m[samp_id], u_m_e[samp_id]
+print('Merger time:%.3e, 1-e_max:%.3e'%(t_m, u_m_e))
 
-M1, M2, chi1, chi2, chi_eff = data_600[:5]
+M1, M2, chi1, chi2, chi_eff = data_300[:5]
 
 M1, M2 = M1*Ms, M2*Ms
 Mt = M1+M2
@@ -129,8 +133,8 @@ S_Mt = G*Mt**2./c
 
 S1, S2 = chi1*G*M1**2./c, chi2*G*M2**2./c
 
-a_0 = 600.*r_Mt
-J_0, L_0, e_0 = data_600[5:8]
+a_0 = 300.*r_Mt
+J_0, L_0, e_0 = data_300[5:8]
 J_0, L_0 = J_0*S_Mt, L_0*S_Mt
 
 ## draw S 
@@ -213,6 +217,8 @@ y_nat_init = np.hstack([
 #######################################################################
 ### solve ode
 #######################################################################
+
+# to isco
 t_run0 = timeit.default_timer()
 @jit(nopython=True)
 def terminator(t_nat, y_nat_vect, par):
@@ -239,13 +245,42 @@ sol=integ.solve_ivp(int_func, \
         events=term_func)
 
 t_run1 = timeit.default_timer()
-print('run time:', t_run1 - t_run0)
+print('run time (to ISCO):', t_run1 - t_run0)
+
+
+# to 4 M
+t_run0 = timeit.default_timer()
+@jit(nopython=True)
+def terminator(t_nat, y_nat_vect, par):
+    # parse parameters
+    ai_nat = y_nat_vect[0]
+    M1, M2, __, __, \
+    t_unit, Li_unit, __, ai_unit, S1_unit, S2_unit, \
+    br_flag, ss_flag\
+                = par
+
+    ai = ai_nat*ai_unit
+    resi = (ai - 4*r_Mt)/ai_unit
+    return resi
+
+term_func2=lambda t_nat_, y_nat_vect_:terminator(t_nat_, y_nat_vect_, par_LK)
+term_func2.direction = -1
+term_func2.terminal = True
+
+t2 = sol.t[-1]
+y_nat_init2 = sol.y[:, -1]
+sol2=integ.solve_ivp(int_func, \
+        t_span=(t2, t2+1e9), y0=y_nat_init2, rtol=rtol, atol=atol, \
+        events=term_func2)
+
+t_run1 = timeit.default_timer()
+print('run time (ISCO to 4 M):', t_run1 - t_run0)
 
 #######################################################################
 ### output
 #######################################################################
 
-# get sol
+# get sol at ISCO
 tt = sol.t*t_unit
 
 a_orb = sol.y[0, :]*a_unit 
@@ -294,6 +329,10 @@ fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6
             J_0/S_Mt, L_0/S_Mt, S_0/S_Mt, \
             J[-1]/S_Mt, L_orb[-1]/S_Mt, S[-1]/S_Mt, \
             theta1_SL[-1], theta2_SL[-1], theta_SS[-1]))
+fid.close()
+
+fid = open(data_dir + prefix + 'bin_pre_cond.txt', 'a')
+fid.write('%.9e\t%.6e\n'%(u_m_e, t_m))
 fid.close()
 
 if plot_flag:
@@ -357,3 +396,55 @@ if plot_flag:
     plt.savefig(fig_dir + prefix + 'spin_bin.pdf')
     plt.close()
     
+
+    
+# get sol at 4 M 
+tt = sol2.t*t_unit
+
+a_orb = sol2.y[0, :]*a_unit 
+f_gw = np.sqrt(G*Mt/a_orb**3.)/np.pi
+
+L_x = sol2.y[1, :]*L_unit 
+L_y = sol2.y[2, :]*L_unit 
+L_z = sol2.y[3, :]*L_unit 
+L_orb = np.sqrt(L_x**2. + L_y**2. + L_z**2.)
+
+S1_x = sol2.y[7, :]*S1_unit
+S1_y = sol2.y[8, :]*S1_unit
+S1_z = sol2.y[9, :]*S1_unit
+S1 = np.median(np.sqrt(S1_x**2. + S1_y**2. + S1_z**2.))
+
+S2_x = sol2.y[10, :]*S2_unit 
+S2_y = sol2.y[11, :]*S2_unit
+S2_z = sol2.y[12, :]*S2_unit
+S2 = np.median(np.sqrt(S2_x**2. + S2_y**2. + S2_z**2.))
+
+S_x = S1_x + S2_x
+S_y = S1_y + S2_y
+S_z = S1_z + S2_z
+S = np.sqrt(S_x**2. + S_y**2. + S_z**2.)
+
+J_x = L_x + S1_x + S2_x
+J_y = L_y + S1_y + S2_y
+J_z = L_z + S1_z + S2_z
+J = np.sqrt(J_x**2. + J_y**2. + J_z**2.)
+
+print('4 Mt J, L, S:', J[-1]/S_Mt, L_orb[-1]/S_Mt, S[-1]/S_Mt)
+
+theta1_SL = np.real(np.arccos(\
+        (S1_x*L_x + S1_y*L_y + S1_z*L_z)/(S1*L_orb)+0j
+                      ))
+theta2_SL = np.real(np.arccos(\
+        (S2_x*L_x + S2_y*L_y + S2_z*L_z)/(S2*L_orb)+0j
+                      ))
+theta_SS = np.real(np.arccos(\
+        (S1_x*S2_x + S1_y*S2_y + S1_z*S2_z)/(S1*S2)+0j
+                    ))
+
+fid = open(data_dir + prefix + 'bin_evol_4Mt.txt', 'a')
+fid.write('%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n'\
+          %(M1/Ms, M2/Ms, chi1, chi2, chi_eff, \
+            J_0/S_Mt, L_0/S_Mt, S_0/S_Mt, \
+            J[-1]/S_Mt, L_orb[-1]/S_Mt, S[-1]/S_Mt, \
+            theta1_SL[-1], theta2_SL[-1], theta_SS[-1]))
+fid.close()
