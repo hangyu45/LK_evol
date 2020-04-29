@@ -146,7 +146,7 @@ def check_DA_given_ei_max(ei_max, \
 
 
 @jit(nopython=True, fastmath=True)
-def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
+def get_dy_orb_GR_GW(y_orb_vect, par, par_GR, fudge_gw=1.):
     """
     GR precession & GW decay
     """
@@ -192,6 +192,10 @@ def get_dy_orb_GR_GW(y_orb_vect, par, par_GR):
     # GW radiation
     dLi_GW_v = dLi_GW * uLi_v
     dei_GW_v = dei_GW * ei_v
+    
+    dai *= fudge_gw
+    dLi_GW_v *= fudge_gw
+    dei_GW_v *= fudge_gw
         
     # total
     dai =np.array([dai])
@@ -831,7 +835,7 @@ def evol_LK_quad_sa(t_nat, y_nat_vect, par):
     return dy_nat_vect
 
 @jit(nopython=True, fastmath=True)
-def evol_binary(t_nat, y_nat_vect, par):
+def evol_binary(t_nat, y_nat_vect, par, fudge_gw=1.):
     # parse parameters
     # 0
     # 1-6
@@ -885,7 +889,7 @@ def evol_binary(t_nat, y_nat_vect, par):
     dai,\
     dLi_GR_x, dLi_GR_y, dLi_GR_z, \
     dei_GR_x, dei_GR_y, dei_GR_z\
-        = get_dy_orb_GR_GW(y_orb_vect, par, par_GR)
+        = get_dy_orb_GR_GW(y_orb_vect, par, par_GR, fudge_gw=fudge_gw)
         
     # get SL & SS terms
     y_SP_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
@@ -1032,7 +1036,7 @@ def get_dSdt(J, L, e, S, par):
         * np.sin(th1) * np.sin(th2) * np.sin(dphi)
     return dSdt
 
-def find_Smp(J, L, e, par, nPt=8000):
+def find_Smp(J, L, e, par, nPt=1000):
     M1, M2, S1, S2, chi_eff = par
     qq=M2/M1
     Mt=M1+M2
@@ -1118,10 +1122,12 @@ def find_S_chi_contour(J, L, e, par, nPt=1000):
 def get_tau_pre(J, L, e, par, nPt=1000):
     M1, M2, S1, S2, chi_eff = par
 
-    Sm, Sp = find_Smp(J, L, e, par)
+    Sm, Sp = find_Smp(J, L, e, par, nPt)
     S_vect = np.linspace(Sm, Sp, nPt)
     dSdt_vect = get_dSdt(J, L, e, S_vect, par)
-    tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect), S_vect)
+    
+    idx = np.isfinite(dSdt_vect)
+    tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect[idx]), S_vect[idx])
     return tau_pre    
 
 def evol_J_avg(L_nat, J_nat, e_vs_L_func, par, nPt=8000):
