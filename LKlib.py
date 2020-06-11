@@ -568,7 +568,93 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     return dy_SP_vect
 
 @jit(nopython=True, fastmath=True)
-def evol_LK_quad_da(t_nat, y_nat_vect, par):
+def get_dy_SMBH_da(y_SMBH_vect, par, par_SMBH):
+    """
+    GR effects associated w/ SMBH
+    """
+    # parse input
+    Li_x, Li_y, Li_z, ei_x, ei_y, ei_z, \
+    Lo_x, Lo_y, Lo_z, eo_x, eo_y, eo_z, \
+    S1_x, S1_y, S1_z, S2_x, S2_y, S2_z \
+                = y_SMBH_vect
+        
+    # global par
+    M1, M2, M3, ao,\
+    t_unit, Li_unit, Lo_unit, ai_unit, S1_unit, S2_unit, \
+    br_flag, ss_flag\
+                = par
+        
+    # use same set of par for the LK evol
+    mu_i, mu_o, omega_i, ai, \
+    Li_e0, Lo_e0, ei, eo, eff_i, eff_o,\
+    S1, S2,\
+    uLi_x, uLi_y, uLi_z, \
+    uLo_x, uLo_y, uLo_z, \
+    uS1_x, uS1_y, uS1_z, \
+    uS2_x, uS2_y, uS2_z, \
+    smbh_flag, I_S3, phi_S3\
+                = par_SMBH
+
+    # scalar quantities
+    ### FIXME ###
+    S3 = G*M3**2./c # assuming maximally spinning SMBH
+    
+    G_c2_ao = G/(c**2.*ao)
+    omega_o = np.sqrt(G*(M1+M2+M3)/ao**3.)
+    Li = Li_e0 * eff_i
+    Lo = Lo_e0 * eff_i
+    
+    omega_LT_S3 = 0.5 * G_c2_ao*S3*(4.+3.*(M1+M2)/M3)/(ao**2.*(1.-eo**2.)**1.5)
+    omega_dS_io = 1.5 * G_c2_ao*(M3+mu_o/3.)*omega_o/(1.-eo**2.)
+    omega_dS_SLo = omega_dS_io
+    
+    # directional products 
+    uLi_v = np.array([uLi_x, uLi_y, uLi_z])
+    ei_v  = np.array([ei_x,  ei_y,  ei_z ])
+    uLo_v = np.array([uLo_x, uLo_y, uLo_z])
+    eo_v  = np.array([eo_x,  eo_y,  eo_z])
+    uS1_v = np.array([uS1_x, uS1_y, uS1_z])
+    uS2_v = np.array([uS2_x, uS2_y, uS2_z])
+    
+    ### FIXME ###
+    uS3_v = np.array([np.sin(I_S3)*np.cos(phi_S3), 
+                      np.sin(I_S3)*np.sin(phi_S3),
+                      np.cos(I_S3)]) 
+    # Lo/S3 ~ 5e-6; ignoring backreaction onto S3
+    
+    uS3_c_uLo = cross(uS3_v, uLo_v)
+    uLo_c_uLi = cross(uLo_v, uLi_v)
+    uLo_c_ei  = cross(uLo_v, ei_v)
+    uLo_c_uS1 = cross(uLo_v, uS1_v)
+    uLo_c_uS2 = cross(uLo_v, uS2_v)
+    
+    # effect 1: LT of Lo around S3; ignoring back-reaction on S3
+    dLo_v = Lo * omega_LT_S3 * uS3_c_uLo
+    ### fixme ###
+    deo_v = np.zeros(3) # fix circular outer orbit
+    
+    # effect 2: dS of Li around Lo; ignoring back-reaction on Lo
+    dLi_v = Li * omega_dS_io * uLo_c_uLi
+    dei_v = omega_dS_io * uLo_c_ei
+    
+    # effect 3: dS of S1, S2 around Lo; ignoring back-reaction on Lo
+    dS1_v = S1 * omega_dS_SLo * uLo_c_uS1 
+    dS2_v = S2 * omega_dS_SLo * uLo_c_uS2 
+    
+    # total 
+    dy_SMBH_vect = np.array([\
+        dLi_v[0], dLi_v[1], dLi_v[2], dei_v[0], dei_v[1], dei_v[2], \
+        dLo_v[0], dLo_v[1], dLo_v[2], deo_v[0], deo_v[1], deo_v[2], \
+        dS1_v[0], dS1_v[1], dS1_v[2], dS2_v[0], dS2_v[1], dS2_v[2]\
+    ])
+    
+    dy_SMBH_vect *= smbh_flag
+    
+    return dy_SMBH_vect
+
+@jit(nopython=True, fastmath=True)
+def evol_LK_quad_da(t_nat, y_nat_vect, par, \
+                    smbh_flag=0, I_S3 = np.pi/6, phi_S3 = 0.):
     # parse parameters
     # 0
     # 1-6
@@ -666,34 +752,60 @@ def evol_LK_quad_da(t_nat, y_nat_vect, par):
     dS1_SP_x, dS1_SP_y, dS1_SP_z, \
     dS2_SP_x, dS2_SP_y, dS2_SP_z\
         = get_dy_SP(y_SP_vect, par, par_SP)
+    
+    
+    # get the SMBH related GR effects
+    y_SMBH_vect = np.array([Li_v[0], Li_v[1], Li_v[2], \
+                            ei_v[0], ei_v[1], ei_v[2], \
+                            Lo_v[0], Lo_v[1], Lo_v[2], \
+                            eo_v[0], eo_v[1], eo_v[2], \
+                            S1_v[0], S1_v[1], S1_v[2], \
+                            S2_v[0], S2_v[1], S2_v[2]])
+    par_SMBH = np.array([mu_i, mu_o, omega_i, ai, \
+                        Li_e0, Lo_e0, ei, eo, eff_i, eff_o,\
+                        S1, S2, \
+                        uLi_v[0], uLi_v[1], uLi_v[2], \
+                        uLo_v[0], uLo_v[1], uLo_v[2], \
+                        uS1_v[0], uS1_v[1], uS1_v[2], \
+                        uS2_v[0], uS2_v[1], uS2_v[2], 
+                        smbh_flag, I_S3, phi_S3])
+    
+    dLi_SMBH_x, dLi_SMBH_y, dLi_SMBH_z, \
+    dei_SMBH_x, dei_SMBH_y, dei_SMBH_z, \
+    dLo_SMBH_x, dLo_SMBH_y, dLo_SMBH_z, \
+    deo_SMBH_x, deo_SMBH_y, deo_SMBH_z, \
+    dS1_SMBH_x, dS1_SMBH_y, dS1_SMBH_z, \
+    dS2_SMBH_x, dS2_SMBH_y, dS2_SMBH_z\
+        = get_dy_SMBH_da(y_SMBH_vect, par, par_SMBH)
+    
             
     # total 
     # GW of semi-major axis
     dai_nat = dai / ai_unit
     
-    # inner orb sees GR&GW + LK + SP back reaction
-    dLi_nat_x = (dLi_GR_x + dLi_LK_x + dLi_SP_x) / Li_unit
-    dLi_nat_y = (dLi_GR_y + dLi_LK_y + dLi_SP_y) / Li_unit
-    dLi_nat_z = (dLi_GR_z + dLi_LK_z + dLi_SP_z) / Li_unit
-    dei_x = dei_GR_x + dei_LK_x + dei_SP_x
-    dei_y = dei_GR_y + dei_LK_y + dei_SP_y
-    dei_z = dei_GR_z + dei_LK_z + dei_SP_z
+    # inner orb sees GR&GW + LK + SP back reaction + SMBH effects
+    dLi_nat_x = (dLi_GR_x + dLi_LK_x + dLi_SP_x + dLi_SMBH_x) / Li_unit
+    dLi_nat_y = (dLi_GR_y + dLi_LK_y + dLi_SP_y + dLi_SMBH_y) / Li_unit
+    dLi_nat_z = (dLi_GR_z + dLi_LK_z + dLi_SP_z + dLi_SMBH_z) / Li_unit
+    dei_x = dei_GR_x + dei_LK_x + dei_SP_x + dei_SMBH_x
+    dei_y = dei_GR_y + dei_LK_y + dei_SP_y + dei_SMBH_y
+    dei_z = dei_GR_z + dei_LK_z + dei_SP_z + dei_SMBH_z
     
-    # outer orb sees only LK
-    dLo_nat_x = dLo_LK_x / Lo_unit
-    dLo_nat_y = dLo_LK_y / Lo_unit
-    dLo_nat_z = dLo_LK_z / Lo_unit
-    deo_x = deo_LK_x 
-    deo_y = deo_LK_y 
-    deo_z = deo_LK_z 
+    # outer orb sees only LK & SMBH effects
+    dLo_nat_x = (dLo_LK_x + dLo_SMBH_x) / Lo_unit 
+    dLo_nat_y = (dLo_LK_y + dLo_SMBH_y) / Lo_unit
+    dLo_nat_z = (dLo_LK_z + dLo_SMBH_z) / Lo_unit
+    deo_x = deo_LK_x + deo_SMBH_x
+    deo_y = deo_LK_y + deo_SMBH_y
+    deo_z = deo_LK_z + deo_SMBH_z
     
     # S1/S2 sees SP (de Sitter & Lense-Thirring)
-    dS1_nat_x = dS1_SP_x / S1_unit
-    dS1_nat_y = dS1_SP_y / S1_unit
-    dS1_nat_z = dS1_SP_z / S1_unit
-    dS2_nat_x = dS2_SP_x / S2_unit
-    dS2_nat_y = dS2_SP_y / S2_unit
-    dS2_nat_z = dS2_SP_z / S2_unit
+    dS1_nat_x = (dS1_SP_x + dS1_SMBH_x) / S1_unit
+    dS1_nat_y = (dS1_SP_y + dS1_SMBH_y) / S1_unit
+    dS1_nat_z = (dS1_SP_z + dS1_SMBH_z) / S1_unit
+    dS2_nat_x = (dS2_SP_x + dS2_SMBH_x) / S2_unit
+    dS2_nat_y = (dS2_SP_y + dS2_SMBH_y) / S2_unit
+    dS2_nat_z = (dS2_SP_z + dS2_SMBH_z) / S2_unit
     
     dy_nat_vect = np.array([\
             dai_nat, \
