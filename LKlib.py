@@ -587,99 +587,99 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     return dy_SP_vect    
     
     
-@jit(nopython=True, fastmath=True)
-def get_dy_SP_backup(y_SP_vect, par, par_SP):
-    """
-    de Sitter spin-orbit & Lense Thirring spin-spin
-    """
-    # parse input
-    Li_x, Li_y, Li_z, \
-    ei_x, ei_y, ei_z, \
-    S1_x, S1_y, S1_z, \
-    S2_x, S2_y, S2_z \
-        = y_SP_vect
+# @jit(nopython=True, fastmath=True)
+# def get_dy_SP_backup(y_SP_vect, par, par_SP):
+#     """
+#     de Sitter spin-orbit & Lense Thirring spin-spin
+#     """
+#     # parse input
+#     Li_x, Li_y, Li_z, \
+#     ei_x, ei_y, ei_z, \
+#     S1_x, S1_y, S1_z, \
+#     S2_x, S2_y, S2_z \
+#         = y_SP_vect
         
-    # global par
-    M1, M2, M3, ao,\
-    t_unit, Li_unit, Lo_unit, ai_unit, S1_unit, S2_unit, \
-    br_flag, ss_flag\
-                = par
+#     # global par
+#     M1, M2, M3, ao,\
+#     t_unit, Li_unit, Lo_unit, ai_unit, S1_unit, S2_unit, \
+#     br_flag, ss_flag\
+#                 = par
         
-    # par for LK calc
-    mu_i, omega_i, ai, \
-    Li_e0, ei, eff_i, S1, S2, \
-    uLi_x, uLi_y, uLi_z, \
-    uS1_x, uS1_y, uS1_z, uS2_x, uS2_y, uS2_z\
-                = par_SP
+#     # par for LK calc
+#     mu_i, omega_i, ai, \
+#     Li_e0, ei, eff_i, S1, S2, \
+#     uLi_x, uLi_y, uLi_z, \
+#     uS1_x, uS1_y, uS1_z, uS2_x, uS2_y, uS2_z\
+#                 = par_SP
         
-    # scalar quantities
-    G_c2 = G/c**2.
-    ai3_eff_i3 = (ai*eff_i)**3.
-    omega1_SL = 1.5*G_c2*(M2+mu_i/3.)/(ai*eff_i**2.)*omega_i
-    omega2_SL = 1.5*G_c2*(M1+mu_i/3.)/(ai*eff_i**2.)*omega_i
-    omega1_SL_br = 0.5*G_c2*S1*(4.+3.*M2/M1)/(ai3_eff_i3)
-    omega2_SL_br = 0.5*G_c2*S2*(4.+3.*M1/M2)/(ai3_eff_i3)
+#     # scalar quantities
+#     G_c2 = G/c**2.
+#     ai3_eff_i3 = (ai*eff_i)**3.
+#     omega1_SL = 1.5*G_c2*(M2+mu_i/3.)/(ai*eff_i**2.)*omega_i
+#     omega2_SL = 1.5*G_c2*(M1+mu_i/3.)/(ai*eff_i**2.)*omega_i
+#     omega1_SL_br = 0.5*G_c2*S1*(4.+3.*M2/M1)/(ai3_eff_i3)
+#     omega2_SL_br = 0.5*G_c2*S2*(4.+3.*M1/M2)/(ai3_eff_i3)
     
-    omega1_SL_S1 = omega1_SL * S1
-    omega2_SL_S2 = omega2_SL * S2
-    omega1_SL_br_Li = omega1_SL_br*Li_e0*eff_i * br_flag
-    omega2_SL_br_Li = omega2_SL_br*Li_e0*eff_i * br_flag
+#     omega1_SL_S1 = omega1_SL * S1
+#     omega2_SL_S2 = omega2_SL * S2
+#     omega1_SL_br_Li = omega1_SL_br*Li_e0*eff_i * br_flag
+#     omega2_SL_br_Li = omega2_SL_br*Li_e0*eff_i * br_flag
     
-    omega1_SS = 0.5*G_c2*S2/(ai3_eff_i3)
-    omega2_SS = 0.5*G_c2*S1/(ai3_eff_i3)
-    omega_SS_br = -1.5*G_c2*S1*S2/(mu_i*omega_i)/(ai3_eff_i3*ai**2.*eff_i)
+#     omega1_SS = 0.5*G_c2*S2/(ai3_eff_i3)
+#     omega2_SS = 0.5*G_c2*S1/(ai3_eff_i3)
+#     omega_SS_br = -1.5*G_c2*S1*S2/(mu_i*omega_i)/(ai3_eff_i3*ai**2.*eff_i)
     
-    omega1_SS_S1 = omega1_SS * S1 * ss_flag
-    omega2_SS_S2 = omega2_SS * S2 * ss_flag
-    omega_SS_br_Li = omega_SS_br*Li_e0*eff_i * ss_flag * br_flag
+#     omega1_SS_S1 = omega1_SS * S1 * ss_flag
+#     omega2_SS_S2 = omega2_SS * S2 * ss_flag
+#     omega_SS_br_Li = omega_SS_br*Li_e0*eff_i * ss_flag * br_flag
     
-    # directional products 
-    uLi_v = np.array([uLi_x, uLi_y, uLi_z])
-    ei_v  = np.array([ei_x,  ei_y,  ei_z ])
-    uS1_v = np.array([uS1_x, uS1_y, uS1_z])
-    uS2_v = np.array([uS2_x, uS2_y, uS2_z])
+#     # directional products 
+#     uLi_v = np.array([uLi_x, uLi_y, uLi_z])
+#     ei_v  = np.array([ei_x,  ei_y,  ei_z ])
+#     uS1_v = np.array([uS1_x, uS1_y, uS1_z])
+#     uS2_v = np.array([uS2_x, uS2_y, uS2_z])
     
-#     uLi_d_uS1 = inner(uLi_v, uS1_v)
-#     uLi_d_uS2 = inner(uLi_v, uS2_v)
-#     uS1_d_uS2 = inner(uS1_v, uS2_v)
-    uLi_d_uS1 = (uLi_x*uS1_x + uLi_y*uS1_y + uLi_z*uS1_z)
-    uLi_d_uS2 = (uLi_x*uS2_x + uLi_y*uS2_y + uLi_z*uS2_z)
-    uS1_d_uS2 = (uS1_x*uS2_x + uS1_y*uS2_y + uS1_z*uS2_z)
+# #     uLi_d_uS1 = inner(uLi_v, uS1_v)
+# #     uLi_d_uS2 = inner(uLi_v, uS2_v)
+# #     uS1_d_uS2 = inner(uS1_v, uS2_v)
+#     uLi_d_uS1 = (uLi_x*uS1_x + uLi_y*uS1_y + uLi_z*uS1_z)
+#     uLi_d_uS2 = (uLi_x*uS2_x + uLi_y*uS2_y + uLi_z*uS2_z)
+#     uS1_d_uS2 = (uS1_x*uS2_x + uS1_y*uS2_y + uS1_z*uS2_z)
     
-    uLi_c_uS1_v = cross(uLi_v, uS1_v)
-    uLi_c_uS2_v = cross(uLi_v, uS2_v)
-    uS1_c_uS2_v = cross(uS1_v, uS2_v)
-    uS1_c_ei_v  = cross(uS1_v, ei_v )
-    uS2_c_ei_v  = cross(uS2_v, ei_v )
-    uLi_c_ei_v  = cross(uLi_v, ei_v ) 
+#     uLi_c_uS1_v = cross(uLi_v, uS1_v)
+#     uLi_c_uS2_v = cross(uLi_v, uS2_v)
+#     uS1_c_uS2_v = cross(uS1_v, uS2_v)
+#     uS1_c_ei_v  = cross(uS1_v, ei_v )
+#     uS2_c_ei_v  = cross(uS2_v, ei_v )
+#     uLi_c_ei_v  = cross(uLi_v, ei_v ) 
 
-    # de Sitter
-    dLi_SL_v = omega1_SL_br_Li * (-uLi_c_uS1_v)\
-             + omega2_SL_br_Li * (-uLi_c_uS2_v)
-    dei_SL_v = omega1_SL_br * (uS1_c_ei_v - 3.*uLi_d_uS1*uLi_c_ei_v)\
-             + omega2_SL_br * (uS2_c_ei_v - 3.*uLi_d_uS2*uLi_c_ei_v)
-    dS1_SL_v = omega1_SL_S1 * (uLi_c_uS1_v)
-    dS2_SL_v = omega2_SL_S2 * (uLi_c_uS2_v)
+#     # de Sitter
+#     dLi_SL_v = omega1_SL_br_Li * (-uLi_c_uS1_v)\
+#              + omega2_SL_br_Li * (-uLi_c_uS2_v)
+#     dei_SL_v = omega1_SL_br * (uS1_c_ei_v - 3.*uLi_d_uS1*uLi_c_ei_v)\
+#              + omega2_SL_br * (uS2_c_ei_v - 3.*uLi_d_uS2*uLi_c_ei_v)
+#     dS1_SL_v = omega1_SL_S1 * (uLi_c_uS1_v)
+#     dS2_SL_v = omega2_SL_S2 * (uLi_c_uS2_v)
     
-    # Lense-Thirring
-    dLi_SS_v = omega_SS_br_Li * (- uLi_d_uS1*uLi_c_uS2_v - uLi_d_uS2*uLi_c_uS1_v)
-    dei_SS_v = omega_SS_br * (uLi_d_uS1*uS2_c_ei_v + uLi_d_uS2*uS1_c_ei_v\
-                             +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_v)
-    dS1_SS_v = omega1_SS_S1 * (- uS1_c_uS2_v - 3.*uLi_d_uS2*uLi_c_uS1_v)
-    dS2_SS_v = omega2_SS_S2 * (+ uS1_c_uS2_v - 3.*uLi_d_uS1*uLi_c_uS2_v)
+#     # Lense-Thirring
+#     dLi_SS_v = omega_SS_br_Li * (- uLi_d_uS1*uLi_c_uS2_v - uLi_d_uS2*uLi_c_uS1_v)
+#     dei_SS_v = omega_SS_br * (uLi_d_uS1*uS2_c_ei_v + uLi_d_uS2*uS1_c_ei_v\
+#                              +(uS1_d_uS2 - 5.*uLi_d_uS1*uLi_d_uS2)*uLi_c_ei_v)
+#     dS1_SS_v = omega1_SS_S1 * (- uS1_c_uS2_v - 3.*uLi_d_uS2*uLi_c_uS1_v)
+#     dS2_SS_v = omega2_SS_S2 * (+ uS1_c_uS2_v - 3.*uLi_d_uS1*uLi_c_uS2_v)
     
-    # total 
-    dLi_v = dLi_SL_v + dLi_SS_v
-    dei_v = dei_SL_v + dei_SS_v
-    dS1_v = dS1_SL_v + dS1_SS_v
-    dS2_v = dS2_SL_v + dS2_SS_v
+#     # total 
+#     dLi_v = dLi_SL_v + dLi_SS_v
+#     dei_v = dei_SL_v + dei_SS_v
+#     dS1_v = dS1_SL_v + dS1_SS_v
+#     dS2_v = dS2_SL_v + dS2_SS_v
     
-    dy_SP_vect = np.array([\
-                 dLi_v[0], dLi_v[1], dLi_v[2], \
-                 dei_v[0], dei_v[1], dei_v[2], \
-                 dS1_v[0], dS1_v[1], dS1_v[2], \
-                 dS2_v[0], dS2_v[1], dS2_v[2]])
-    return dy_SP_vect
+#     dy_SP_vect = np.array([\
+#                  dLi_v[0], dLi_v[1], dLi_v[2], \
+#                  dei_v[0], dei_v[1], dei_v[2], \
+#                  dS1_v[0], dS1_v[1], dS1_v[2], \
+#                  dS2_v[0], dS2_v[1], dS2_v[2]])
+#     return dy_SP_vect
 
 @jit(nopython=True, fastmath=True)
 def get_dy_SMBH_da(y_SMBH_vect, par, par_SMBH):
