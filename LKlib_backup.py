@@ -605,10 +605,8 @@ def get_dy_SMBH_da(y_SMBH_vect, par, par_SMBH):
     Lo = Lo_e0 * eff_i
     
     omega_LT_S3 = 0.5 * G_c2_ao*S3*(4.+3.*(M1+M2)/M3)/(ao**2.*(1.-eo**2.)**1.5)
-    omega_dS_io = 1.5 * G_c2_ao*(M3+mu_o/3.)*omega_o/(1.-eo**2.)
-    omega_dS_SLo = omega_dS_io
-    
-    omega_LT_dir = 0.5 * G_c2_ao*S3/(ao**2.*(1.-eo**2.)**1.5)
+    omega_dS_io = 1.5 * G_c2_ao*(M3+mu_o/3.)*omega_o/(1.-eo**2.) 
+    omega_dS_SLo = omega_dS_io 
     
     # directional products 
     uLi_v = np.array([uLi_x, uLi_y, uLi_z])
@@ -624,38 +622,24 @@ def get_dy_SMBH_da(y_SMBH_vect, par, par_SMBH):
                       np.cos(I_S3)]) 
     # Lo/S3 ~ 5e-6; ignoring backreaction onto S3
     
-    uLo_d_uS3 = inner(uLo_v, uS3_v)
-    
     uS3_c_uLo = cross(uS3_v, uLo_v)
-    uS3_c_uLi = cross(uS3_v, uLi_v)
-    uS3_c_uS1 = cross(uS3_v, uS1_v)
-    uS3_c_uS2 = cross(uS3_v, uS2_v)
     uLo_c_uLi = cross(uLo_v, uLi_v)
     uLo_c_ei  = cross(uLo_v, ei_v)
     uLo_c_uS1 = cross(uLo_v, uS1_v)
     uLo_c_uS2 = cross(uLo_v, uS2_v)
     
-    # effect 1: LT (in fact, dS br) of Lo around S3; ignoring back-reaction on S3
+    # effect 1: LT of Lo around S3; ignoring back-reaction on S3
     dLo_v = Lo * omega_LT_S3 * uS3_c_uLo
     ### fixme ###
     deo_v = np.zeros(3) # fix circular outer orbit
     
     # effect 2: dS of Li around Lo; ignoring back-reaction on Lo
-    dLi_v_dS = Li * omega_dS_io * uLo_c_uLi
-    dei_v    = omega_dS_io * uLo_c_ei
+    dLi_v = Li * omega_dS_io * uLo_c_uLi
+    dei_v = omega_dS_io * uLo_c_ei
     
     # effect 3: dS of S1, S2 around Lo; ignoring back-reaction on Lo
-    dS1_v_dS = S1 * omega_dS_SLo * uLo_c_uS1 
-    dS2_v_dS = S2 * omega_dS_SLo * uLo_c_uS2 
-    
-    # effect 4: LT of Li, S1, S2 around S3
-    dLi_v_LT = Li * omega_LT_dir * (uS3_c_uLi - 3.*uLo_d_uS3*uLo_c_uLi)
-    dS1_v_LT = S1 * omega_LT_dir * (uS3_c_uS1 - 3.*uLo_d_uS3*uLo_c_uS1)
-    dS2_v_LT = S2 * omega_LT_dir * (uS3_c_uS2 - 3.*uLo_d_uS3*uLo_c_uS2)
-    
-    dLi_v = dLi_v_dS + dLi_v_LT
-    dS1_v = dS1_v_dS + dS1_v_LT
-    dS2_v = dS2_v_dS + dS2_v_LT
+    dS1_v = S1 * omega_dS_SLo * uLo_c_uS1 
+    dS2_v = S2 * omega_dS_SLo * uLo_c_uS2 
     
     # total 
     dy_SMBH_vect = np.array([\
