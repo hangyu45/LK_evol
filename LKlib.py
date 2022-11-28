@@ -567,8 +567,8 @@ def get_dy_SP(y_SP_vect, par, par_SP):
     # quad-mono
     dLi_QM_v = omega1_QM_br_Li * (-2.*uLi_d_uS1*uLi_c_uS1_v) \
              + omega2_QM_br_Li * (-2.*uLi_d_uS2*uLi_c_uS2_v)
-    dei_QM_v = omega1_QM_br * (-2.*uLi_d_uS1*uLi_c_uS1_v + (1.-5.*uLi_d_uS1**2.)*uLi_c_ei_v)\
-             + omega2_QM_br * (-2.*uLi_d_uS2*uLi_c_uS2_v + (1.-5.*uLi_d_uS2**2.)*uLi_c_ei_v)
+    dei_QM_v = omega1_QM_br * (2.*uLi_d_uS1*uS1_c_ei_v + (1.-5.*uLi_d_uS1**2.)*uLi_c_ei_v)\
+             + omega2_QM_br * (2.*uLi_d_uS2*uS2_c_ei_v + (1.-5.*uLi_d_uS2**2.)*uLi_c_ei_v)
     
     dS1_QM_v = omega1_QM_S1 * (-3.*uLi_d_uS1*uLi_c_uS1_v)
     dS2_QM_v = omega2_QM_S2 * (-3.*uLi_d_uS2*uLi_c_uS2_v)
@@ -1270,13 +1270,34 @@ def get_dSdt(J, L, e, S, par):
     eff = np.sqrt(1.-e**2.)
     
     th1, th2, th12, dphi = get_angles(J, L, e, S, par)
+    S_Mt = G*Mt**2./c
+    t_Mt = G*Mt/c**3.
+    L_S_Mt = L/S_Mt
     
-    dSdt = 1.5*eta**6. * eff**3. * (1-qq**2.)/qq * ((G*Mt**2./c)/L)**5.\
-        * (c**3./G/Mt) * (S1*S2/S)\
-        * (-1. + 0.5*qq/(1.-qq)**2.*(J**2.-L**2.-S**2.)/L**2. \
-          - 2.*qq**2./(1.-qq**2.)**2.*G*Mt**2./c/L*chi_eff)\
+    dSdt = 1.5*eta**6. * eff**3. * (1-qq**2.)/qq * (L_S_Mt)**(-5.)\
+        * (S1*S2/S/t_Mt)\
+        * (-1. + eta*chi_eff/L_S_Mt)\
         * np.sin(th1) * np.sin(th2) * np.sin(dphi)
     return dSdt
+
+# @jit(nopython=True)
+# def get_dSdt(J, L, e, S, par):
+#     M1, M2, S1, S2, chi_eff = par
+    
+#     qq=M2/M1
+#     Mt=M1+M2
+#     mu=M1*M2/Mt
+#     eta=mu/Mt
+#     eff = np.sqrt(1.-e**2.)
+    
+#     th1, th2, th12, dphi = get_angles(J, L, e, S, par)
+    
+#     dSdt = 1.5*eta**6. * eff**3. * (1-qq**2.)/qq * ((G*Mt**2./c)/L)**5.\
+#         * (c**3./G/Mt) * (S1*S2/S)\
+#         * (-1. + 0.5*qq/(1.-qq)**2.*(J**2.-L**2.-S**2.)/L**2. \
+#           - 2.*qq**2./(1.-qq**2.)**2.*G*Mt**2./c/L*chi_eff)\
+#         * np.sin(th1) * np.sin(th2) * np.sin(dphi)
+#     return dSdt
 
 def find_Smp(J, L, e, par, nPt=1000):
     M1, M2, S1, S2, chi_eff = par
@@ -1371,6 +1392,25 @@ def get_tau_pre(J, L, e, par, nPt=1000):
     idx = np.isfinite(dSdt_vect)
     tau_pre = 2.*integ.trapz(1./np.abs(dSdt_vect[idx]), S_vect[idx])
     return tau_pre    
+
+@jit(nopython=True)
+def get_tau_pre_char(J_char, L, e, par):
+    M1, M2, S1, S2, chi_eff = par
+    qq = M2/M1
+    Mt = M1 + M2 
+    mu = M1 * M2 / Mt
+    eta = mu/Mt
+    
+    S_Mt = G*Mt**2/c
+    t_Mt = G*Mt/c**3.
+    
+    S_char = np.sqrt(J_char**2. - L**2.)
+    dSdt_char = (1.-qq**2.)/qq\
+              * eta**6.*(1.-e**2.)**(1.5)\
+              * (L/S_Mt)**(-5.)\
+              * (S1*S2/t_Mt/S_char)
+    tau_pre_char = 2.*S_char / dSdt_char
+    return tau_pre_char
 
 def evol_J_avg(L_nat, J_nat, e_vs_L_func, par, nPt=8000):
     M1, M2, S1, S2, chi_eff = par
