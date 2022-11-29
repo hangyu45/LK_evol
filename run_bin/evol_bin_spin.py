@@ -81,11 +81,11 @@ L_init = mu * np.sqrt(G*Mt*a_init)
 
 L_v_init = np.array([0, 0, 1]) * L_init
 
-cS1L = np.random.uniform()
-cS2L = np.random.uniform()
+cS1L = np.random.uniform(low=-1, high=1)
+cS2L = np.random.uniform(low=-1, high=1)
 
-phiS1 = np.random.uniform() * 2.*np.pi
-phiS2 = np.random.uniform() * 2.*np.pi
+phiS1 = np.random.uniform(low=0, high=2.*np.pi)
+phiS2 = np.random.uniform(low=0, high=2.*np.pi)
 
 sS1L = np.sqrt(1.-cS1L**2.)
 sS2L = np.sqrt(1.-cS2L**2.)
